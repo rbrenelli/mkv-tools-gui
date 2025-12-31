@@ -10,7 +10,18 @@ import stat
 from pathlib import Path
 
 class DependencyManager:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(DependencyManager, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self):
+        if self._initialized:
+            return
+
         self.os_name = platform.system()
         self.arch = platform.machine()
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -31,6 +42,8 @@ class DependencyManager:
 
         # Tools we manage
         self.tools = ['ffmpeg', 'ffprobe', 'mkvmerge', 'mkvextract']
+        self._binary_cache = {}
+        self._initialized = True
 
     def _ensure_dir_writable(self, path):
         try:
@@ -132,9 +145,13 @@ class DependencyManager:
 
     def get_binary_path(self, tool_name):
         """Returns absolute path to tool, prioritizing system PATH"""
+        if tool_name in self._binary_cache:
+            return self._binary_cache[tool_name]
+
         # 1. Check System PATH
         system_path = shutil.which(tool_name)
         if system_path:
+            self._binary_cache[tool_name] = system_path
             return system_path
 
         # 2. Check managed bin directory
@@ -144,9 +161,12 @@ class DependencyManager:
 
         local_path = os.path.join(self.bin_dir, exe_name)
         if os.path.exists(local_path):
+            self._binary_cache[tool_name] = local_path
             return local_path
 
         # Return None or just the tool name to let subprocess fail naturally if not found
+        # We cache the fallback as well to avoid re-searching
+        self._binary_cache[tool_name] = tool_name
         return tool_name
 
     def download_dependencies(self, progress_callback=None):

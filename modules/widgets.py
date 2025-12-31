@@ -26,6 +26,8 @@ class TrackListFrame(ctk.CTkScrollableFrame):
         ]
         self.tracks = []
         self.track_widgets = {} # map tid -> dict of widgets/vars
+        self.source_filename = "video" # Default base name for extraction
+        self.generated_filenames = set()
 
         # Bind scroll events
         self._bind_mouse_wheel(self)
@@ -54,9 +56,12 @@ class TrackListFrame(ctk.CTkScrollableFrame):
             widget.destroy()
         self.track_widgets = {}
         self.tracks = []
+        self.generated_filenames = set()
 
         if not file_path:
             return
+
+        self.source_filename = os.path.splitext(os.path.basename(file_path))[0]
 
         if file_path.lower().endswith('.mkv'):
             info = get_mkv_info(file_path)
@@ -78,8 +83,6 @@ class TrackListFrame(ctk.CTkScrollableFrame):
             
             # Row Frame - cleaner look with subtle background
             # Alternating colors: lighter/darker stripes
-            # Adjusted for better contrast per user feedback
-            # Light mode: White vs #e5e7eb (Gray 200) - clear stripe effect
             stripe_color = theme.COLOR_LIST_STRIPE_EVEN if i % 2 == 0 else theme.COLOR_LIST_STRIPE_ODD
             
             row = ctk.CTkFrame(self, fg_color=stripe_color, corner_radius=4)
@@ -91,18 +94,28 @@ class TrackListFrame(ctk.CTkScrollableFrame):
             chk.pack(side="left", padx=(10, 5))
             
             if self.extract_mode:
-                # -- EXTRACT MODE: Just info, no editing --
-                # Format: [TYPE] ID:x | Codec | Lang | Name
+                # -- EXTRACT MODE: Info + Output Filename --
+                # Format: [TYPE] ID:x | Codec | Lang | Name -> Output Name Entry
+
                 info_text = f"[{ttype.upper()}] ID:{tid} | {codec} | {lang}"
                 if name:
                     info_text += f" | {name}"
                     
-                ctk.CTkLabel(row, text=info_text, anchor="w", font=ctk.CTkFont(size=12)).pack(side="left", padx=5, fill="x", expand=True)
+                ctk.CTkLabel(row, text=info_text, anchor="w", font=ctk.CTkFont(size=12)).pack(side="left", padx=5, width=250)
+
+                # Generate default output filename with duplicate handling
+                default_out_name = self._generate_default_filename(track)
+                out_name_var = ctk.StringVar(value=default_out_name)
                 
+                ctk.CTkLabel(row, text="Output:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left", padx=5)
+                out_name_entry = ctk.CTkEntry(row, textvariable=out_name_var, height=28, placeholder_text="Output Filename")
+                out_name_entry.pack(side="left", fill="x", expand=True, padx=(0, 10), pady=2)
+
                 # Store minimal data
                 self.track_widgets[tid] = {
                     "keep_var": keep_var,
-                    "type": ttype
+                    "type": ttype,
+                    "out_name_var": out_name_var
                 }
             else:
                 # -- EDIT MODE: Full controls --
@@ -152,6 +165,45 @@ class TrackListFrame(ctk.CTkScrollableFrame):
             # Ensure new widgets are scrollable
             self._bind_mouse_wheel(row)
 
+    def _generate_default_filename(self, track):
+        props = track.get("properties", {})
+        codec = props.get("codec_id", "")
+        lang = props.get("language", "und")
+        name = props.get("track_name", "")
+
+        # Determine extension
+        ext = ".dat"
+        if "SSA" in codec or "ASS" in codec: ext = ".ass"
+        elif "SRT" in codec or "UTF8" in codec: ext = ".srt"
+        elif "PGS" in codec: ext = ".sup"
+        elif "VOBSUB" in codec: ext = ".sub"
+        elif "AAC" in codec: ext = ".aac"
+        elif "AC3" in codec: ext = ".ac3"
+        elif "AVC" in codec or "H264" in codec: ext = ".h264"
+        elif "HEVC" in codec or "H265" in codec: ext = ".h265"
+
+        parts = [self.source_filename]
+
+        if lang and lang != "und":
+            parts.append(lang)
+
+        if name:
+            safe_name = "".join(c for c in name if c.isalnum() or c in (' ', '.', '_', '-')).strip()
+            if safe_name:
+                parts.append(safe_name)
+
+        base_name = ".".join(parts)
+        out_name = base_name + ext
+
+        # Unique handling
+        counter = 1
+        while out_name in self.generated_filenames:
+            out_name = f"{base_name}_{counter}{ext}"
+            counter += 1
+
+        self.generated_filenames.add(out_name)
+        return out_name
+
     def select_all(self):
         for data in self.track_widgets.values():
             data["keep_var"].set(True)
@@ -168,6 +220,20 @@ class TrackListFrame(ctk.CTkScrollableFrame):
                 selected.append(tid)
         return selected
 
+    def get_extraction_map(self):
+        """
+        For Extract Mode.
+        Returns a dictionary: {track_id: output_filename} for selected tracks.
+        """
+        if not self.extract_mode:
+            return {}
+
+        mapping = {}
+        for tid, data in self.track_widgets.items():
+            if data["keep_var"].get():
+                mapping[tid] = data["out_name_var"].get()
+        return mapping
+
     def get_options(self):
         """
         Returns a tuple: (keep_track_ids, track_opts)
@@ -180,9 +246,6 @@ class TrackListFrame(ctk.CTkScrollableFrame):
         for tid, data in self.track_widgets.items():
             if data["keep_var"].get():
                 ttype = data["type"].lower()
-                # Map mkvmerge types to CLI flag types
-                # output of -J uses "video", "audio", "subtitles" usually
-                # CLI flags for --video-tracks etc need IDs.
                 
                 if "video" in ttype:
                     keep_map['video'].append(str(tid))
@@ -192,7 +255,6 @@ class TrackListFrame(ctk.CTkScrollableFrame):
                     keep_map['subtitles'].append(str(tid))
                 
                 # Language change
-                # We always set it to be safe/consistent
                 code = data["lang_var"].get().split(" ")[0]
                 opts.extend(["--language", f"{tid}:{code}"])
                 
@@ -203,9 +265,8 @@ class TrackListFrame(ctk.CTkScrollableFrame):
                 # Default & Forced
                 is_def = "1" if data["default_var"].get() else "0"
                 opts.extend(["--default-track-flag", f"{tid}:{is_def}"])
-                opts.extend(["--forced-display-flag", f"{tid}:0"]) # Always 0 for now
+                opts.extend(["--forced-display-flag", f"{tid}:0"])
             else:
-                # If unchecked, we just ensure it's not in the keep lists.
                 pass
                 
         return keep_map, opts
@@ -250,13 +311,11 @@ class FileListFrame(ctk.CTkScrollableFrame):
         import os
         
         i = len(self.rows)
-        # Consistent stripe color
         stripe_color = theme.COLOR_LIST_STRIPE_EVEN if i % 2 == 0 else theme.COLOR_LIST_STRIPE_ODD
         
         row = ctk.CTkFrame(self, fg_color=stripe_color, corner_radius=4)
         row.pack(fill="x", padx=5, pady=2)
         
-        # Ensure scroll works
         self._bind_mouse_wheel(row)
         
         # Filename label
@@ -265,7 +324,6 @@ class FileListFrame(ctk.CTkScrollableFrame):
         
         # Language detection (simple)
         initial_lang = self.languages[0]
-        # logic handled by caller usually, but let's just default to first
         
         lang_var = ctk.StringVar(value=initial_lang)
         lang_menu = ctk.CTkOptionMenu(row, values=self.languages, variable=lang_var, width=150)
@@ -288,7 +346,7 @@ class FileListFrame(ctk.CTkScrollableFrame):
             "name_var": name_var,
             "default_var": default_var,
             "widget": row,
-            "lang_menu": lang_menu # exposed for caller to set values or callbacks
+            "lang_menu": lang_menu
         }
         self.rows.append(row_data)
         return row_data

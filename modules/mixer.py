@@ -8,6 +8,7 @@ import subprocess
 from tkinter import PanedWindow
 from modules.widgets import TrackListFrame, FileListFrame
 from utils import theme
+from utils.dependency_manager import DependencyManager
 
 class MixerFrame(ctk.CTkFrame):
     def __init__(self, master):
@@ -22,14 +23,14 @@ class MixerFrame(ctk.CTkFrame):
         self.header.grid(row=0, column=0, padx=10, pady=(10, 15), sticky="w")
 
         # Standard File Selection
-        self.mkv_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.mkv_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
-        self.mkv_frame.grid_columnconfigure(1, weight=1)
+        self.video_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.video_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+        self.video_frame.grid_columnconfigure(1, weight=1)
         
-        ctk.CTkLabel(self.mkv_frame, text="Source MKV:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=(0, 10))
-        self.mkv_entry = ctk.CTkEntry(self.mkv_frame, height=40)
-        self.mkv_entry.grid(row=0, column=1, padx=0, sticky="ew")
-        ctk.CTkButton(self.mkv_frame, text="Browse", command=self.browse_mkv, width=100, height=40).grid(row=0, column=2, padx=(10, 0))
+        ctk.CTkLabel(self.video_frame, text="Source Video:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=(0, 10))
+        self.video_entry = ctk.CTkEntry(self.video_frame, height=40)
+        self.video_entry.grid(row=0, column=1, padx=0, sticky="ew")
+        ctk.CTkButton(self.video_frame, text="Browse", command=self.browse_video, width=100, height=40).grid(row=0, column=2, padx=(10, 0))
  
         # Main content area with PanedWindow for resizability
         self.pane = ctk.CTkFrame(self, fg_color="transparent")
@@ -37,27 +38,24 @@ class MixerFrame(ctk.CTkFrame):
         self.pane.grid_columnconfigure(0, weight=1)
         self.pane.grid_rowconfigure(0, weight=1)
 
-        # Style the PanedWindow sash and background
-        
-        from tkinter import PanedWindow, Frame
+        from tkinter import PanedWindow
         self.paned_window = PanedWindow(self.pane, orient="vertical", 
                                          sashwidth=6, bg=theme.COLOR_SASH,
                                          sashpad=0, bd=0, opaqueresize=True)
         self.paned_window.grid(row=0, column=0, sticky="nsew")
 
-        # Top Section Wrapper (Dynamic ctk.CTkFrame)
-        # We use a tuple color to ensure it switches automatically between light/dark
+        # Top Section Wrapper
         self.top_wrapper = ctk.CTkFrame(self.paned_window, fg_color=theme.COLOR_BG_MAIN, corner_radius=0)
         self.paned_window.add(self.top_wrapper, minsize=100)
         
         # Top Section: Base MKV Tracks
-        self.base_tracks_title = ctk.CTkLabel(self.top_wrapper, text="Original MKV Tracks", font=ctk.CTkFont(weight="bold"))
+        self.base_tracks_title = ctk.CTkLabel(self.top_wrapper, text="Original Video Tracks", font=ctk.CTkFont(weight="bold"))
         self.base_tracks_title.pack(padx=10, pady=(5, 5), anchor="w")
         
         self.base_track_list = TrackListFrame(self.top_wrapper)
         self.base_track_list.pack(fill="both", expand=True, padx=5, pady=(0, 5))
 
-        # Bottom Section Wrapper (Dynamic ctk.CTkFrame)
+        # Bottom Section Wrapper
         self.bottom_wrapper = ctk.CTkFrame(self.paned_window, fg_color=theme.COLOR_BG_MAIN, corner_radius=0)
         self.paned_window.add(self.bottom_wrapper, minsize=150)
 
@@ -84,16 +82,41 @@ class MixerFrame(ctk.CTkFrame):
         self.sub_list_frame = FileListFrame(self.sub_container)
         self.sub_list_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
 
+        # Output Options Frame (Transparency)
+        self.out_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.out_frame.grid(row=6, column=0, padx=10, pady=(5, 0), sticky="ew")
+
+        # Output Format
+        ctk.CTkLabel(self.out_frame, text="Format:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 5))
+        self.out_fmt_var = ctk.StringVar(value="mkv")
+
+        self.rb_mkv = ctk.CTkRadioButton(self.out_frame, text="MKV", variable=self.out_fmt_var, value="mkv", width=60)
+        self.rb_mkv.pack(side="left", padx=5)
+        self.rb_mp4 = ctk.CTkRadioButton(self.out_frame, text="MP4", variable=self.out_fmt_var, value="mp4", width=60)
+        self.rb_mp4.pack(side="left", padx=5)
+
+        # Output Filename & Dir
+        self.out_name_var = ctk.StringVar()
+        self.out_dir_var = ctk.StringVar()
+
+        ctk.CTkLabel(self.out_frame, text="Output Name:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(15, 5))
+        self.out_name_entry = ctk.CTkEntry(self.out_frame, textvariable=self.out_name_var, width=200)
+        self.out_name_entry.pack(side="left", padx=5)
+
+        ctk.CTkButton(self.out_frame, text="Select Output Dir", command=self.select_out_dir, width=120).pack(side="left", padx=10)
+        self.out_dir_lbl = ctk.CTkLabel(self.out_frame, textvariable=self.out_dir_var, text_color="gray")
+        self.out_dir_lbl.pack(side="left", padx=5)
+
         # Action Buttons
         self.action_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.action_frame.grid(row=6, column=0, padx=10, pady=(10, 20), sticky="ew")
+        self.action_frame.grid(row=7, column=0, padx=10, pady=(10, 20), sticky="ew")
         
         self.process_btn = ctk.CTkButton(self.action_frame, text="Process & Save", command=self.process, 
                                           state="disabled", height=45, font=ctk.CTkFont(size=14, weight="bold"))
         self.process_btn.pack(side="right")
 
-        self.mkv_path = None
-        self.sub_files = [] # List of dicts: {path, lang_var, name_var}
+        self.video_path = None
+        self.sub_files = []
         
         self.languages = [
             "eng (English)", "spa (Spanish)", "por (Portuguese)", "fra (French)", 
@@ -116,14 +139,26 @@ class MixerFrame(ctk.CTkFrame):
             'hi': 'hin', 'hin': 'hin', 'hindi': 'hin'
         }
 
-    def browse_mkv(self):
-        file_path = file_dialogs.select_file("Select MKV File", filetypes=[("MKV Files", "*.mkv")])
+    def browse_video(self):
+        file_path = file_dialogs.select_file("Select Video File", filetypes=[("Video Files", "*.mkv *.mp4 *.avi"), ("All Files", "*.*")])
         if file_path:
-            self.mkv_path = file_path
-            self.mkv_entry.delete(0, "end")
-            self.mkv_entry.insert(0, file_path)
+            self.video_path = file_path
+            self.video_entry.delete(0, "end")
+            self.video_entry.insert(0, file_path)
             self.base_track_list.load_tracks(file_path)
+
+            # Default Output defaults
+            dirname = os.path.dirname(file_path)
+            basename = os.path.splitext(os.path.basename(file_path))[0]
+            self.out_dir_var.set(dirname)
+            self.out_name_var.set(basename + "_muxed")
+
             self.check_ready()
+
+    def select_out_dir(self):
+        d = file_dialogs.select_directory("Select Output Directory")
+        if d:
+            self.out_dir_var.set(d)
 
     def add_subs(self):
         file_paths = file_dialogs.select_files("Select Subtitle Files", filetypes=[("Subtitle Files", "*.srt *.ass *.ssa *.sub")])
@@ -155,7 +190,6 @@ class MixerFrame(ctk.CTkFrame):
 
         row_data = self.sub_list_frame.add_file_row(path, on_default_click)
         
-        # Auto-fill logic (preserving existing behavior)
         detected_lang = self.detect_language(path)
         initial_lang = detected_lang if detected_lang else self.languages[0]
         row_data["lang_var"].set(initial_lang)
@@ -166,7 +200,6 @@ class MixerFrame(ctk.CTkFrame):
         is_default = (initial_lang.split(" ")[0] == "eng")
         row_data["default_var"].set(is_default)
         
-        # Add callback for language change updating name
         def update_name(choice):
             lang_name = choice.split("(")[1].replace(")", "")
             row_data["name_var"].set(lang_name)
@@ -180,24 +213,33 @@ class MixerFrame(ctk.CTkFrame):
         self.check_ready()
 
     def check_ready(self):
-        if self.mkv_path and self.sub_files:
+        if self.video_path and self.sub_files:
             self.process_btn.configure(state="normal")
         else:
             self.process_btn.configure(state="disabled")
 
     def process(self):
-        if not self.mkv_path or not self.sub_files:
+        if not self.video_path or not self.sub_files: return
+
+        out_fmt = self.out_fmt_var.get()
+        out_name = self.out_name_var.get()
+        out_dir = self.out_dir_var.get()
+
+        if not out_name or not out_dir:
+            messagebox.showwarning("Warning", "Please specify output directory and filename.")
             return
 
-        output_path = file_dialogs.save_file(
-            title="Save Muxed MKV",
-            defaultextension=".mkv", 
-            filetypes=[("MKV Files", "*.mkv")],
-            initialfile=os.path.splitext(os.path.basename(self.mkv_path))[0] + "_muxed.mkv"
-        )
-        if not output_path:
-            return
+        if not out_name.lower().endswith(f".{out_fmt}"):
+            out_name += f".{out_fmt}"
 
+        output_path = os.path.join(out_dir, out_name)
+
+        if out_fmt == "mkv":
+            self._process_mkv(output_path)
+        else:
+            self._process_mp4(output_path)
+
+    def _process_mkv(self, output_path):
         mkvmerge = shutil.which("mkvmerge")
         if not mkvmerge:
             messagebox.showerror("Error", "mkvmerge not found.")
@@ -205,54 +247,76 @@ class MixerFrame(ctk.CTkFrame):
 
         cmd = [mkvmerge, "-o", output_path]
         
-        # Base MKV options from TrackListFrame
         keep_map, track_opts = self.base_track_list.get_options()
         
-        if keep_map['video']:
-            cmd.extend(["--video-tracks", ",".join(keep_map['video'])])
-        else:
-            cmd.append("--no-video")
+        if keep_map['video']: cmd.extend(["--video-tracks", ",".join(keep_map['video'])])
+        else: cmd.append("--no-video")
             
-        if keep_map['audio']:
-            cmd.extend(["--audio-tracks", ",".join(keep_map['audio'])])
-        else:
-            cmd.append("--no-audio")
+        if keep_map['audio']: cmd.extend(["--audio-tracks", ",".join(keep_map['audio'])])
+        else: cmd.append("--no-audio")
             
-        if keep_map['subtitles']:
-            cmd.extend(["--subtitle-tracks", ",".join(keep_map['subtitles'])])
-        else:
-            cmd.append("--no-subtitles")
+        if keep_map['subtitles']: cmd.extend(["--subtitle-tracks", ",".join(keep_map['subtitles'])])
+        else: cmd.append("--no-subtitles")
         
         cmd.extend(track_opts)
-        cmd.append(self.mkv_path)
+        cmd.append(self.video_path)
         
         for item in self.sub_files:
             lang_code = item["lang_var"].get().split(" ")[0]
             track_name = item["name_var"].get()
             sub_path = item["path"]
             
-            # Add options for the NEXT file (the subtitle file)
             is_def = "1" if item["default_var"].get() else "0"
             cmd.extend(["--language", f"0:{lang_code}"])
-            if track_name:
-                cmd.extend(["--track-name", f"0:{track_name}"])
+            if track_name: cmd.extend(["--track-name", f"0:{track_name}"])
             cmd.extend(["--default-track-flag", f"0:{is_def}"])
             cmd.extend(["--forced-display-flag", "0:0"])
             
             cmd.append(sub_path)
 
+        self._run_cmd(cmd, "mkvmerge")
+
+    def _process_mp4(self, output_path):
+        ffmpeg = DependencyManager().get_binary_path("ffmpeg")
+        if not ffmpeg:
+            messagebox.showerror("Error", "ffmpeg not found.")
+            return
+
+        cmd = [ffmpeg, "-y", "-i", self.video_path]
+
+        # Add inputs for external subs
+        for item in self.sub_files:
+            cmd.extend(["-i", item["path"]])
+
+        keep_map, _ = self.base_track_list.get_options()
+
+        # Map kept tracks
+        for vid in keep_map['video']: cmd.extend(["-map", f"0:{vid}"])
+        for aid in keep_map['audio']: cmd.extend(["-map", f"0:{aid}"])
+        for sid in keep_map['subtitles']: cmd.extend(["-map", f"0:{sid}"])
+
+        # Map External Subtitles
+        for i in range(len(self.sub_files)):
+            cmd.extend(["-map", f"{i+1}:0"])
+
+        cmd.extend(["-c:v", "copy", "-c:a", "copy", "-c:s", "mov_text"])
+        cmd.append(output_path)
+
+        self._run_cmd(cmd, "ffmpeg")
+
+    def _run_cmd(self, cmd, tool_name):
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode <= 1:
-                if result.returncode == 1:
-                    warn_msg = f"File saved successfully at:\n{output_path}\n\n"
-                    warn_msg += "mkvmerge reported warnings about your input files:\n\n"
-                    warn_msg += result.stdout
-                    messagebox.showwarning("Success with Warnings", warn_msg)
-                else:
-                    messagebox.showinfo("Success", f"File saved to:\n{output_path}")
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+            result = subprocess.run(cmd, capture_output=True, text=True, startupinfo=startupinfo)
+            if result.returncode == 0:
+                messagebox.showinfo("Success", f"File saved to:\n{cmd[-1] if tool_name == 'ffmpeg' else cmd[2]}")
+            elif tool_name == "mkvmerge" and result.returncode == 1:
+                messagebox.showwarning("Success with Warnings", f"Warnings:\n{result.stdout}")
             else:
-                err_msg = f"Stderr:\n{result.stderr}\n\nStdout:\n{result.stdout}"
-                messagebox.showerror("Error", f"mkvmerge failed:\n{err_msg}")
+                messagebox.showerror("Error", f"{tool_name} failed:\n{result.stderr}\n{result.stdout}")
         except Exception as e:
             messagebox.showerror("Error", f"Exception: {e}")

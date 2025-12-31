@@ -26,13 +26,13 @@ class ExtractorFrame(ctk.CTkFrame):
         self.file_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
         self.file_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(self.file_frame, text="Source File:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=(0, 10))
+        ctk.CTkLabel(self.file_frame, text="Source Video:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=(0, 10))
         self.file_entry = ctk.CTkEntry(self.file_frame, placeholder_text="Select video file...", height=40)
         self.file_entry.grid(row=0, column=1, sticky="ew")
         ctk.CTkButton(self.file_frame, text="Browse", command=self.browse_file, width=100, height=40).grid(row=0, column=2, padx=(10, 0))
 
         # Tracks Label (External)
-        self.tracks_label = ctk.CTkLabel(self, text="Available Tracks", font=ctk.CTkFont(weight="bold"))
+        self.tracks_label = ctk.CTkLabel(self, text="Available Tracks (Edit output filename in list)", font=ctk.CTkFont(weight="bold"))
         self.tracks_label.grid(row=2, column=0, padx=10, pady=(10, 5), sticky="w")
 
         # Track List
@@ -48,120 +48,75 @@ class ExtractorFrame(ctk.CTkFrame):
         ctk.CTkButton(self.sel_btn_frame, text="Deselect All", width=100, height=28, 
                       command=lambda: self.track_list.deselect_all()).pack(side="left")
 
+        # Output Directory (Transparency)
+        self.out_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.out_frame.grid(row=5, column=0, padx=10, pady=(10, 0), sticky="ew")
+
+        ctk.CTkButton(self.out_frame, text="Select Output Directory", command=self.select_out_dir, width=160).pack(side="left", padx=(0, 10))
+        self.out_dir_var = ctk.StringVar(value="Same as Source")
+        self.out_dir_lbl = ctk.CTkLabel(self.out_frame, textvariable=self.out_dir_var, text_color="gray")
+        self.out_dir_lbl.pack(side="left", padx=5)
+
         # Action Buttons
         self.action_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.action_frame.grid(row=5, column=0, padx=10, pady=(10, 20), sticky="ew")
+        self.action_frame.grid(row=6, column=0, padx=10, pady=(10, 20), sticky="ew")
         
         self.extract_btn = ctk.CTkButton(self.action_frame, text="Extract Selected Tracks", command=self.extract_tracks, 
                                           state="disabled", height=45, font=ctk.CTkFont(size=14, weight="bold"))
         self.extract_btn.pack(side="right")
-        self.tracks = []
-        self.check_vars = {} # map track_id -> checkbox_var
+
+        self.video_path = None
+        self.selected_out_dir = None
 
     def browse_file(self):
         file_path = file_dialogs.select_file("Select Video File", filetypes=file_dialogs.VIDEO_FILE_TYPES)
         if file_path:
-            self.mkv_path = file_path
+            self.video_path = file_path
             self.file_entry.delete(0, "end")
             self.file_entry.insert(0, file_path)
-            self.load_tracks()
+            self.track_list.load_tracks(file_path)
 
-    def load_tracks(self):
-        self.tracks = [] # Kept for internal reference if needed, but TrackListFrame handles display
-        if self.mkv_path:
-            self.track_list.load_tracks(self.mkv_path)
-            # We also need to get the raw tracks for our internal mapping logic later
-            # Ideally TrackListFrame exposes raw tracks, but we can also re-fetch or make it public.
-            # For now, let's just let TrackListFrame handle the UI.
-            # But wait, extract_tracks needs the track object to determine extension.
-            # So we should fetch info here too or ask TrackListFrame.
-            if self.mkv_path.lower().endswith('.mkv'):
-                info = get_mkv_info(self.mkv_path)
-            else:
-                info = get_ffmpeg_info(self.mkv_path)
+            # Reset output dir
+            self.selected_out_dir = None
+            self.out_dir_var.set(os.path.dirname(file_path))
 
-            if info:
-                self.tracks = info.get("tracks", [])
-                
-        self.extract_btn.configure(state="normal")
+            self.extract_btn.configure(state="normal")
+
+    def select_out_dir(self):
+        d = file_dialogs.select_directory("Select Output Directory")
+        if d:
+            self.selected_out_dir = d
+            self.out_dir_var.set(d)
 
     def extract_tracks(self):
-        selected_ids = self.track_list.get_selected_ids()
-        if not selected_ids:
+        # Get mapping from TrackListFrame
+        track_map_raw = self.track_list.get_extraction_map()
+        if not track_map_raw:
             messagebox.showwarning("Warning", "No tracks selected.")
             return
 
-        output_dir = file_dialogs.select_directory(title="Select Output Directory")
-        if not output_dir:
-            return
+        # Determine output directory
+        output_dir = self.selected_out_dir if self.selected_out_dir else os.path.dirname(self.video_path)
 
-        track_map = {}
-        base_name = os.path.splitext(os.path.basename(self.mkv_path))[0]
-        
-        # Keep track of generated filenames to handle duplicates
-        used_filenames = set()
+        # Finalize full paths
+        final_track_map = {} # id -> full path
+        for tid, filename in track_map_raw.items():
+            if not filename:
+                messagebox.showwarning("Warning", f"Filename missing for Track ID {tid}")
+                return
+            final_track_map[tid] = os.path.join(output_dir, filename)
 
-        # Sort selected_ids to ensure deterministic order (usually track order)
-        for tid in sorted(selected_ids):
-            # Find track info
-            track = next((t for t in self.tracks if t["id"] == tid), None)
-            if not track: 
-                continue
-
-            props = track.get("properties", {})
-            codec = props.get("codec_id", "")
-            lang = props.get("language", "und")
-            name = props.get("track_name", "")
-            
-            # Determine extension
-            ext = ".dat"
-            if "SSA" in codec or "ASS" in codec: ext = ".ass"
-            elif "SRT" in codec or "UTF8" in codec: ext = ".srt"
-            elif "PGS" in codec: ext = ".sup"
-            elif "VOBSUB" in codec: ext = ".sub"
-            elif "AAC" in codec: ext = ".aac"
-            elif "AC3" in codec: ext = ".ac3"
-            elif "AVC" in codec or "H264" in codec: ext = ".h264"
-            elif "HEVC" in codec or "H265" in codec: ext = ".h265"
-            
-            # Build filename parts
-            parts = [base_name]
-            
-            # 1. Language Code
-            if lang and lang != "und":
-                parts.append(lang)
-            
-            # 2. Track Name (Sanitized)
-            if name:
-                # Allow alphanumeric, spaces, dots, underscores, dashes
-                safe_name = "".join(c for c in name if c.isalnum() or c in (' ', '.', '_', '-')).strip()
-                if safe_name:
-                    parts.append(safe_name)
-                    
-            current_base = ".".join(parts)
-            out_name = current_base + ext
-            
-            # 3. Duplicate Handling
-            counter = 1
-            while out_name in used_filenames:
-                # Append counter before extension
-                out_name = f"{current_base}_{counter}{ext}"
-                counter += 1
-            
-            used_filenames.add(out_name)
-            track_map[tid] = os.path.join(output_dir, out_name)
-
-        if self.mkv_path.lower().endswith('.mkv'):
-            success, msg = extract_tracks(self.mkv_path, track_map)
+        if self.video_path.lower().endswith('.mkv'):
+            success, msg = extract_tracks(self.video_path, final_track_map)
             if success:
-                messagebox.showinfo("Success", "Tracks extracted successfully.")
+                messagebox.showinfo("Success", f"Tracks extracted to:\n{output_dir}")
             else:
                 messagebox.showerror("Error", f"Extraction failed:\n{msg}")
         else:
             # Non-MKV extraction using ffmpeg
             errors = []
-            for tid, output_path in track_map.items():
-                cmd = extract_stream_cmd(self.mkv_path, tid, output_path)
+            for tid, output_path in final_track_map.items():
+                cmd = extract_stream_cmd(self.video_path, tid, output_path)
                 try:
                     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
                     if result.returncode != 0:
@@ -170,6 +125,6 @@ class ExtractorFrame(ctk.CTkFrame):
                     errors.append(f"Track {tid}: {str(e)}")
 
             if not errors:
-                messagebox.showinfo("Success", "Tracks extracted successfully.")
+                messagebox.showinfo("Success", f"Tracks extracted to:\n{output_dir}")
             else:
                 messagebox.showerror("Error", f"Extraction failed for some tracks:\n" + "\n".join(errors))

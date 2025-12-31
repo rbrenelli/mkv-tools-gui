@@ -130,7 +130,7 @@ class TrackListFrame(ctk.CTkScrollableFrame):
                 if name:
                     info_text += f" | {name}"
                     
-                ctk.CTkLabel(row, text=info_text, anchor="w", font=ctk.CTkFont(size=12)).pack(side="left", padx=5, width=250)
+                ctk.CTkLabel(row, text=info_text, anchor="w", font=ctk.CTkFont(size=12), width=250).pack(side="left", padx=5)
 
                 # Generate default output filename with duplicate handling
                 default_out_name = self._generate_default_filename(track)

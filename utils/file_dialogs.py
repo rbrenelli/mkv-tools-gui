@@ -1,6 +1,11 @@
 import subprocess
 import os
 
+VIDEO_FILE_TYPES = [
+    ("Video Files", "*.mkv *.mp4 *.avi *.mov *.m4v"),
+    ("All Files", "*.*")
+]
+
 def _convert_filters(filetypes):
     """
     Convert list of tuples [("Name", "*.ext *.ext2")] 

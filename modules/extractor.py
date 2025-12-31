@@ -2,7 +2,9 @@ import customtkinter as ctk
 from tkinter import messagebox
 from utils import file_dialogs
 import os
+import subprocess
 from utils.mkv_wrapper import get_mkv_info, extract_tracks
+from utils.ffmpeg_wrapper import get_ffmpeg_info, extract_stream_cmd
 from modules.widgets import TrackListFrame
 from utils import theme
 
@@ -24,8 +26,8 @@ class ExtractorFrame(ctk.CTkFrame):
         self.file_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
         self.file_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(self.file_frame, text="Source MKV:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=(0, 10))
-        self.file_entry = ctk.CTkEntry(self.file_frame, placeholder_text="Select MKV file...", height=40)
+        ctk.CTkLabel(self.file_frame, text="Source File:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=(0, 10))
+        self.file_entry = ctk.CTkEntry(self.file_frame, placeholder_text="Select video file...", height=40)
         self.file_entry.grid(row=0, column=1, sticky="ew")
         ctk.CTkButton(self.file_frame, text="Browse", command=self.browse_file, width=100, height=40).grid(row=0, column=2, padx=(10, 0))
 
@@ -57,7 +59,7 @@ class ExtractorFrame(ctk.CTkFrame):
         self.check_vars = {} # map track_id -> checkbox_var
 
     def browse_file(self):
-        file_path = file_dialogs.select_file("Select MKV File", filetypes=[("MKV Files", "*.mkv")])
+        file_path = file_dialogs.select_file("Select Video File", filetypes=file_dialogs.VIDEO_FILE_TYPES)
         if file_path:
             self.mkv_path = file_path
             self.file_entry.delete(0, "end")
@@ -73,7 +75,11 @@ class ExtractorFrame(ctk.CTkFrame):
             # For now, let's just let TrackListFrame handle the UI.
             # But wait, extract_tracks needs the track object to determine extension.
             # So we should fetch info here too or ask TrackListFrame.
-            info = get_mkv_info(self.mkv_path)
+            if self.mkv_path.lower().endswith('.mkv'):
+                info = get_mkv_info(self.mkv_path)
+            else:
+                info = get_ffmpeg_info(self.mkv_path)
+
             if info:
                 self.tracks = info.get("tracks", [])
                 
@@ -145,8 +151,25 @@ class ExtractorFrame(ctk.CTkFrame):
             used_filenames.add(out_name)
             track_map[tid] = os.path.join(output_dir, out_name)
 
-        success, msg = extract_tracks(self.mkv_path, track_map)
-        if success:
-            messagebox.showinfo("Success", "Tracks extracted successfully.")
+        if self.mkv_path.lower().endswith('.mkv'):
+            success, msg = extract_tracks(self.mkv_path, track_map)
+            if success:
+                messagebox.showinfo("Success", "Tracks extracted successfully.")
+            else:
+                messagebox.showerror("Error", f"Extraction failed:\n{msg}")
         else:
-            messagebox.showerror("Error", f"Extraction failed:\n{msg}")
+            # Non-MKV extraction using ffmpeg
+            errors = []
+            for tid, output_path in track_map.items():
+                cmd = extract_stream_cmd(self.mkv_path, tid, output_path)
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                    if result.returncode != 0:
+                        errors.append(f"Track {tid}: {result.stderr}")
+                except Exception as e:
+                    errors.append(f"Track {tid}: {str(e)}")
+
+            if not errors:
+                messagebox.showinfo("Success", "Tracks extracted successfully.")
+            else:
+                messagebox.showerror("Error", f"Extraction failed for some tracks:\n" + "\n".join(errors))

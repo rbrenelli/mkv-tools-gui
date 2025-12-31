@@ -1,6 +1,8 @@
 import customtkinter as ctk
 from utils.mkv_wrapper import get_mkv_info
+from utils.ffmpeg_wrapper import get_ffmpeg_info
 from utils import theme
+import os
 
 class TrackListFrame(ctk.CTkScrollableFrame):
     def __init__(self, master, languages=None, extract_mode=False, default_checked=True, **kwargs):
@@ -46,17 +48,21 @@ class TrackListFrame(ctk.CTkScrollableFrame):
         else: # Windows/macOS
             self._parent_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
             
-    def load_tracks(self, mkv_path):
+    def load_tracks(self, file_path):
         # Clear existing
         for widget in self.winfo_children():
             widget.destroy()
         self.track_widgets = {}
         self.tracks = []
 
-        if not mkv_path:
+        if not file_path:
             return
 
-        info = get_mkv_info(mkv_path)
+        if file_path.lower().endswith('.mkv'):
+            info = get_mkv_info(file_path)
+        else:
+            info = get_ffmpeg_info(file_path)
+
         if not info:
             return
 

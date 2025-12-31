@@ -14,11 +14,30 @@ class DependencyManager:
         self.os_name = platform.system()
         self.arch = platform.machine()
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.bin_dir = os.path.join(self.project_root, 'bin')
+
+        # Determine installation directory
+        # Windows: Keep internal bin to avoid permission issues or polluting system
+        # Linux/Mac: Prefer ~/.local/bin for system-wide user availability
+        if self.os_name == 'Windows':
+            self.bin_dir = os.path.join(self.project_root, 'bin')
+        else:
+            user_bin = os.path.expanduser("~/.local/bin")
+            if self._ensure_dir_writable(user_bin):
+                self.bin_dir = user_bin
+            else:
+                self.bin_dir = os.path.join(self.project_root, 'bin')
+
         self.urls = self._get_urls()
 
         # Tools we manage
         self.tools = ['ffmpeg', 'ffprobe', 'mkvmerge', 'mkvextract']
+
+    def _ensure_dir_writable(self, path):
+        try:
+            os.makedirs(path, exist_ok=True)
+            return os.access(path, os.W_OK)
+        except Exception:
+            return False
 
     def _get_urls(self):
         urls = {}
@@ -31,9 +50,7 @@ class DependencyManager:
                 'type': 'zip',
                 'contains': ['ffmpeg', 'ffprobe']
             }
-            # MKVToolNix (Official 7z - NOTE: 7z extraction requires external tools or py7zr,
-            # falling back to detection or manual user intervention if 7z not supported)
-            # Using a specific version to ensure link stability.
+            # MKVToolNix
             urls['mkvtoolnix_pack'] = {
                 'url': 'https://mkvtoolnix.download/windows/releases/88.0/mkvtoolnix-64-bit-88.0.7z',
                 'type': '7z',
@@ -52,8 +69,7 @@ class DependencyManager:
                     'type': 'tar',
                     'contains': ['ffmpeg', 'ffprobe']
                 }
-                # MKVToolNix for ARM Linux - Standard static builds/AppImages are primarily x86_64.
-                # Skipping automatic download for ARM to avoid incompatible binaries.
+                # MKVToolNix for ARM Linux
                 print(f"Warning: Automatic download of MKVToolNix for Linux ARM ({self.arch}) is not currently supported.")
             else:
                 urls['ffmpeg_pack'] = {
@@ -92,14 +108,18 @@ class DependencyManager:
         return urls
 
     def check_missing_dependencies(self):
-        """Returns a list of tools that are missing from ./bin"""
+        """Returns a list of tools that are missing from system PATH AND ./bin"""
         missing = []
 
-        # Ensure bin directory exists
-        if not os.path.exists(self.bin_dir):
-            return self.tools
+        # Ensure bin directory exists (or at least check writability context implicitly via tools check)
+        # We don't exit early if bin_dir doesn't exist, because we might find tools in system PATH.
 
         for tool in self.tools:
+            # 1. Check System PATH
+            if shutil.which(tool):
+                continue
+
+            # 2. Check managed bin directory
             tool_name = tool
             if self.os_name == 'Windows':
                 tool_name += '.exe'
@@ -111,8 +131,13 @@ class DependencyManager:
         return missing
 
     def get_binary_path(self, tool_name):
-        """Returns absolute path to tool in ./bin, or falls back to system PATH"""
-        # Check ./bin first
+        """Returns absolute path to tool, prioritizing system PATH"""
+        # 1. Check System PATH
+        system_path = shutil.which(tool_name)
+        if system_path:
+            return system_path
+
+        # 2. Check managed bin directory
         exe_name = tool_name
         if self.os_name == 'Windows':
             exe_name += '.exe'
@@ -121,8 +146,8 @@ class DependencyManager:
         if os.path.exists(local_path):
             return local_path
 
-        # Fallback to system path
-        return shutil.which(tool_name)
+        # Return None or just the tool name to let subprocess fail naturally if not found
+        return tool_name
 
     def download_dependencies(self, progress_callback=None):
         """
@@ -130,7 +155,11 @@ class DependencyManager:
         progress_callback: function(current_step, total_steps, message)
         """
         if not os.path.exists(self.bin_dir):
-            os.makedirs(self.bin_dir)
+            try:
+                os.makedirs(self.bin_dir)
+            except Exception as e:
+                print(f"Error creating bin directory {self.bin_dir}: {e}")
+                return
 
         missing = self.check_missing_dependencies()
         if not missing:
@@ -256,6 +285,7 @@ class DependencyManager:
             if self.os_name == 'Darwin':
                 # Mount dmg
                 mount_point = os.path.join(self.bin_dir, 'dmg_mount')
+                os.makedirs(mount_point, exist_ok=True)
                 subprocess.run(['hdiutil', 'attach', archive_path, '-mountpoint', mount_point, '-nobrowse'], check=True)
 
                 try:
@@ -278,7 +308,11 @@ class DependencyManager:
                                 shutil.copy2(src, os.path.join(self.bin_dir, tool))
                 finally:
                     # Unmount
-                    subprocess.run(['hdiutil', 'detach', mount_point], check=True)
+                    subprocess.run(['hdiutil', 'detach', mount_point, '-force'], check=False)
+                    try:
+                        os.rmdir(mount_point)
+                    except:
+                        pass
 
         elif extract_type == '7z':
             # Try using 7z command if available

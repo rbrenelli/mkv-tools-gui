@@ -57,7 +57,7 @@ class MKVToolSuite(ctk.CTk):
                                                     command=self.sidebar_button_event_editor, **btn_opts)
         self.sidebar_button_editor.grid(row=3, column=0, padx=15, pady=5, sticky="ew")
 
-        self.sidebar_button_creator = ctk.CTkButton(self.sidebar_frame, text="  Create MKV",
+        self.sidebar_button_creator = ctk.CTkButton(self.sidebar_frame, text="  Create Video",
                                                      command=self.sidebar_button_event_creator, **btn_opts)
         self.sidebar_button_creator.grid(row=4, column=0, padx=15, pady=5, sticky="ew")
 

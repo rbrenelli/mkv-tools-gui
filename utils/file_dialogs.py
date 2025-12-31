@@ -11,9 +11,32 @@ VIDEO_FILE_TYPES = [
     ("All Files", "*.*")
 ]
 
-# Detect Linux Tools
-_ZENITY_PATH = shutil.which("zenity")
-_KDIALOG_PATH = shutil.which("kdialog")
+def _find_system_binary(name):
+    """
+    Find a system binary, checking common paths as fallback.
+    This is needed because PyInstaller bundles may have a different PATH.
+    """
+    # First try the normal way
+    path = shutil.which(name)
+    if path and os.path.isfile(path):
+        return path
+    
+    # Fallback: check common system paths (important for PyInstaller/AppImage)
+    common_paths = [
+        f"/usr/bin/{name}",
+        f"/bin/{name}",
+        f"/usr/local/bin/{name}",
+        f"/snap/bin/{name}",
+    ]
+    for p in common_paths:
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    
+    return None
+
+# Detect Linux Tools (with fallback for bundled apps)
+_ZENITY_PATH = _find_system_binary("zenity")
+_KDIALOG_PATH = _find_system_binary("kdialog")
 
 @contextmanager
 def _tk_context():

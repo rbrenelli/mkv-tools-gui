@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from utils.mkv_wrapper import get_mkv_info
+from utils import theme
 
 class TrackListFrame(ctk.CTkScrollableFrame):
     def __init__(self, master, languages=None, extract_mode=False, default_checked=True, **kwargs):
@@ -13,10 +14,9 @@ class TrackListFrame(ctk.CTkScrollableFrame):
         # Material Design Polish: Give it a surface look
         # Use a slightly lighter/distinct gray for the list background to create "depth"
         # Increased contrast for Light mode (Gray 200 vs Gray 100 was too subtle, now Gray 200 background)
-        bg_color = ("#e5e7eb", "#1f2937") # Gray 200 / Gray 800
         
         super().__init__(master, label_text="", corner_radius=6, border_width=1, 
-                         fg_color=bg_color, **kwargs)
+                         fg_color=theme.COLOR_BG_LIST, **kwargs)
         self.languages = languages or [
              "eng (English)", "spa (Spanish)", "por (Portuguese)", "fra (French)", 
              "deu (German)", "ita (Italian)", "jpn (Japanese)", "chi (Chinese)", 
@@ -74,7 +74,7 @@ class TrackListFrame(ctk.CTkScrollableFrame):
             # Alternating colors: lighter/darker stripes
             # Adjusted for better contrast per user feedback
             # Light mode: White vs #e5e7eb (Gray 200) - clear stripe effect
-            stripe_color = ("#ffffff", "#111827") if i % 2 == 0 else "transparent"
+            stripe_color = theme.COLOR_LIST_STRIPE_EVEN if i % 2 == 0 else theme.COLOR_LIST_STRIPE_ODD
             
             row = ctk.CTkFrame(self, fg_color=stripe_color, corner_radius=4)
             row.pack(fill="x", padx=5, pady=2)
@@ -212,9 +212,8 @@ class FileListFrame(ctk.CTkScrollableFrame):
     def __init__(self, master, languages=None, **kwargs):
         kwargs.pop("label_text", None)
         # Unified background: Gray 200 / Gray 800
-        bg_color = ("#e5e7eb", "#1f2937") 
         super().__init__(master, label_text="", corner_radius=6, border_width=1, 
-                         fg_color=bg_color, **kwargs)
+                         fg_color=theme.COLOR_BG_LIST, **kwargs)
         
         self.languages = languages or [
              "eng (English)", "spa (Spanish)", "por (Portuguese)", "fra (French)", 
@@ -246,7 +245,7 @@ class FileListFrame(ctk.CTkScrollableFrame):
         
         i = len(self.rows)
         # Consistent stripe color
-        stripe_color = ("#ffffff", "#111827") if i % 2 == 0 else "transparent"
+        stripe_color = theme.COLOR_LIST_STRIPE_EVEN if i % 2 == 0 else theme.COLOR_LIST_STRIPE_ODD
         
         row = ctk.CTkFrame(self, fg_color=stripe_color, corner_radius=4)
         row.pack(fill="x", padx=5, pady=2)

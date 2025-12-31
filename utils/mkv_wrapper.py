@@ -2,11 +2,13 @@ import subprocess
 import json
 import shutil
 import os
+from utils.dependency_manager import DependencyManager
 
 def check_dependencies():
     """Check if mkvmerge and mkvextract are available."""
-    mkvmerge = shutil.which("mkvmerge")
-    mkvextract = shutil.which("mkvextract")
+    dm = DependencyManager()
+    mkvmerge = dm.get_binary_path("mkvmerge")
+    mkvextract = dm.get_binary_path("mkvextract")
     return mkvmerge, mkvextract
 
 def get_mkv_info(mkv_path):
@@ -14,7 +16,7 @@ def get_mkv_info(mkv_path):
     Run mkvmerge -J to get JSON info about the file.
     Returns the parsed JSON object or None on failure.
     """
-    mkvmerge_exe = shutil.which("mkvmerge")
+    mkvmerge_exe = DependencyManager().get_binary_path("mkvmerge")
     if not mkvmerge_exe:
         raise FileNotFoundError("mkvmerge not found")
 
@@ -34,7 +36,7 @@ def extract_tracks(mkv_path, track_id_path_map):
     Extract tracks using mkvextract.
     track_id_path_map: dict mapping track_id (int) -> output_path (str)
     """
-    mkvextract_exe = shutil.which("mkvextract")
+    mkvextract_exe = DependencyManager().get_binary_path("mkvextract")
     if not mkvextract_exe:
         raise FileNotFoundError("mkvextract not found")
 
@@ -61,7 +63,7 @@ def mux_mkv(output_path, input_files, options=None):
     Actually, let's make this generic:
     cmd_args: list of arguments to pass to mkvmerge -o output_path [cmd_args]
     """
-    mkvmerge_exe = shutil.which("mkvmerge")
+    mkvmerge_exe = DependencyManager().get_binary_path("mkvmerge")
     if not mkvmerge_exe:
         raise FileNotFoundError("mkvmerge not found")
 

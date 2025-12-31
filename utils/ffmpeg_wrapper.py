@@ -2,13 +2,15 @@ import subprocess
 import json
 import shutil
 import os
+from utils.dependency_manager import DependencyManager
 
 def check_ffmpeg():
     """
     Returns True if ffmpeg and ffprobe are available in the system PATH.
     """
-    ffmpeg_path = shutil.which("ffmpeg")
-    ffprobe_path = shutil.which("ffprobe")
+    dm = DependencyManager()
+    ffmpeg_path = dm.get_binary_path("ffmpeg")
+    ffprobe_path = dm.get_binary_path("ffprobe")
     return bool(ffmpeg_path and ffprobe_path)
 
 def get_ffmpeg_info(file_path):
@@ -16,7 +18,7 @@ def get_ffmpeg_info(file_path):
     Use ffprobe to get info about a video file and return it in a format
     compatible with the app's existing MKV structure.
     """
-    ffprobe_exe = shutil.which("ffprobe")
+    ffprobe_exe = DependencyManager().get_binary_path("ffprobe")
     if not ffprobe_exe:
         raise FileNotFoundError("ffprobe not found")
 
@@ -99,7 +101,7 @@ def extract_stream_cmd(input_path, track_id, output_path):
     Return a list of strings for the subprocess command to extract a specific track.
     Logic: ffmpeg -i input_path -map 0:<track_id> -c copy output_path
     """
-    ffmpeg_exe = shutil.which("ffmpeg")
+    ffmpeg_exe = DependencyManager().get_binary_path("ffmpeg")
     if not ffmpeg_exe:
         raise FileNotFoundError("ffmpeg not found")
 

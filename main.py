@@ -2,11 +2,13 @@ import customtkinter as ctk
 import os
 import sys
 import tkinter as tk
+import threading
 from modules.extractor import ExtractorFrame
 from modules.mixer import MixerFrame
 from modules.editor import EditorFrame
 from modules.creator import CreatorFrame
 from utils import theme
+from utils.dependency_manager import DependencyManager
 
 class MKVToolSuite(ctk.CTk):
     def __init__(self):
@@ -86,6 +88,55 @@ class MKVToolSuite(ctk.CTk):
 
         # Select default frame
         self.select_frame_by_name("extractor")
+
+        # Check dependencies
+        self.check_dependencies_on_startup()
+
+    def check_dependencies_on_startup(self):
+        dm = DependencyManager()
+        if dm.check_missing_dependencies():
+            # Create a Toplevel window
+            self.setup_window = ctk.CTkToplevel(self)
+            self.setup_window.title("First Run Setup")
+            self.setup_window.geometry("400x150")
+
+            # Center the window
+            self.update_idletasks()
+            width = self.setup_window.winfo_width()
+            height = self.setup_window.winfo_height()
+            x = (self.winfo_screenwidth() // 2) - (width // 2)
+            y = (self.winfo_screenheight() // 2) - (height // 2)
+            self.setup_window.geometry(f"{width}x{height}+{x}+{y}")
+
+            # Make it modal-like
+            self.setup_window.transient(self)
+            self.setup_window.grab_set()
+
+            self.setup_label = ctk.CTkLabel(self.setup_window, text="Downloading required tools (FFmpeg, MKVToolNix)...", wraplength=350)
+            self.setup_label.pack(pady=20)
+
+            self.setup_progress = ctk.CTkProgressBar(self.setup_window, width=300)
+            self.setup_progress.pack(pady=10)
+            self.setup_progress.set(0)
+
+            def update_ui(current, total, message):
+                # Schedule UI update on main thread
+                self.after(0, lambda: self._update_progress_ui(current, total, message))
+
+            def download_task():
+                dm.download_dependencies(update_ui)
+                # Close window when done
+                self.after(0, self.setup_window.destroy)
+
+            threading.Thread(target=download_task, daemon=True).start()
+
+    def _update_progress_ui(self, current, total, message):
+        if hasattr(self, 'setup_progress') and self.setup_progress.winfo_exists():
+            progress = current / total if total > 0 else 0
+            self.setup_progress.set(progress)
+
+        if hasattr(self, 'setup_label') and self.setup_label.winfo_exists():
+            self.setup_label.configure(text=message)
 
     def detect_scaling(self):
         try:

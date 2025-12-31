@@ -4,6 +4,7 @@ from utils import file_dialogs
 import os
 from utils.mkv_wrapper import get_mkv_info, extract_tracks
 from modules.widgets import TrackListFrame
+from utils import theme
 
 class ExtractorFrame(ctk.CTkFrame):
     def __init__(self, master):

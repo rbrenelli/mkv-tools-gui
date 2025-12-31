@@ -1,14 +1,19 @@
 import customtkinter as ctk
 import os
 import sys
+import tkinter as tk
 from modules.extractor import ExtractorFrame
 from modules.mixer import MixerFrame
 from modules.editor import EditorFrame
 from modules.creator import CreatorFrame
+from utils import theme
 
 class MKVToolSuite(ctk.CTk):
     def __init__(self):
         super().__init__()
+
+        # Detect scaling before drawing widgets
+        self.detect_scaling()
 
         self.title("MKV Tool Suite")
         self.geometry("1100x700")
@@ -21,17 +26,11 @@ class MKVToolSuite(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        # Define custom colors for premium look
-        self.accent_color = "#3b82f6"
-        self.hover_color = "#2563eb"
-        self.root_bg = ("#f9fafb", "#111827")
-        self.sidebar_bg = ("#ffffff", "#1f2937")
-
-        self.configure(fg_color=self.root_bg)
+        self.configure(fg_color=theme.COLOR_BG_MAIN)
 
         # Create sidebar frame with widgets
         self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0, 
-                                           fg_color=self.sidebar_bg, border_width=0)
+                                           fg_color=theme.COLOR_BG_SIDEBAR, border_width=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(5, weight=1)
 
@@ -41,7 +40,7 @@ class MKVToolSuite(ctk.CTk):
 
         # Nav Buttons
         btn_opts = {"height": 45, "font": ctk.CTkFont(size=14), "fg_color": "transparent", 
-                    "text_color": ("gray10", "gray90"), "hover_color": ("gray85", "gray25"), 
+                    "text_color": theme.COLOR_BTN_TEXT, "hover_color": theme.COLOR_BTN_HOVER,
                     "anchor": "w", "corner_radius": 8}
 
         self.sidebar_button_extractor = ctk.CTkButton(self.sidebar_frame, text="  Extract Tracks", 
@@ -66,10 +65,10 @@ class MKVToolSuite(ctk.CTk):
         
         self.appearance_mode_optionemenu = ctk.CTkOptionMenu(self.appearance_frame, values=["Light", "Dark", "System"],
                                                                command=self.change_appearance_mode_event,
-                                                               fg_color=("gray90", "gray20"),
-                                                               button_color=("gray85", "gray25"),
-                                                               button_hover_color=("gray80", "gray30"),
-                                                               text_color=("gray10", "gray90"),
+                                                               fg_color=theme.COLOR_APPEARANCE_FG,
+                                                               button_color=theme.COLOR_APPEARANCE_BTN,
+                                                               button_hover_color=theme.COLOR_APPEARANCE_BTN_HOVER,
+                                                               text_color=theme.COLOR_APPEARANCE_TEXT,
                                                                width=180)
         self.appearance_mode_optionemenu.pack(pady=10)
         self.appearance_mode_optionemenu.set(ctk.get_appearance_mode())
@@ -88,6 +87,24 @@ class MKVToolSuite(ctk.CTk):
         # Select default frame
         self.select_frame_by_name("extractor")
 
+    def detect_scaling(self):
+        try:
+            # Create a dummy window to get DPI if needed, but self (ctk.CTk) is already a window
+            # 1 inch = 96 pixels typically on standard screen
+            # self.winfo_fpixels('1i') returns pixels per inch
+            dpi = self.winfo_fpixels('1i')
+            scale_factor = dpi / 96.0
+
+            # Ensure scale factor is reasonable
+            if scale_factor < 1.0:
+                scale_factor = 1.0
+
+            ctk.set_widget_scaling(scale_factor)
+            ctk.set_window_scaling(scale_factor)
+        except Exception as e:
+            # Fallback or just ignore scaling issues on some platforms
+            print(f"DPI scaling detection failed: {e}")
+
     def select_frame_by_name(self, name):
         # set button color for selected button
         for btn, n in [(self.sidebar_button_extractor, "extractor"), 
@@ -95,9 +112,9 @@ class MKVToolSuite(ctk.CTk):
                       (self.sidebar_button_editor, "editor"), 
                       (self.sidebar_button_creator, "creator")]:
             if n == name:
-                btn.configure(fg_color=self.accent_color, text_color="white", hover_color=self.hover_color)
+                btn.configure(fg_color=theme.COLOR_ACCENT, text_color="white", hover_color=theme.COLOR_HOVER)
             else:
-                btn.configure(fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray85", "gray25"))
+                btn.configure(fg_color="transparent", text_color=theme.COLOR_BTN_TEXT, hover_color=theme.COLOR_BTN_HOVER)
 
         # show selected frame
         frames = {
@@ -129,12 +146,5 @@ class MKVToolSuite(ctk.CTk):
         ctk.set_appearance_mode(new_appearance_mode)
 
 if __name__ == "__main__":
-    # Enable high-DPI scaling
-    try:
-        from ctypes import windll
-        windll.shcore.SetProcessDpiAwareness(1)
-    except Exception:
-        pass
-        
     app = MKVToolSuite()
     app.mainloop()

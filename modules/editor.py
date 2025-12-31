@@ -6,6 +6,7 @@ import shutil
 import subprocess
 from utils.mkv_wrapper import get_mkv_info
 from modules.widgets import TrackListFrame
+from utils import theme
 
 class EditorFrame(ctk.CTkFrame):
     def __init__(self, master):

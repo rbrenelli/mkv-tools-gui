@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 from modules.widgets import TrackListFrame, FileListFrame
+from utils import theme
 
 class CreatorFrame(ctk.CTkFrame):
     def __init__(self, master):
@@ -37,16 +38,15 @@ class CreatorFrame(ctk.CTkFrame):
 
         # Style the PanedWindow sash and background
         # Style the PanedWindow sash and background
-        sash_color = "#3b82f6" # Accent blue for visibility
         
         from tkinter import PanedWindow, Frame
         self.paned_window = PanedWindow(self.pane, orient="vertical", 
-                                         sashwidth=6, bg=sash_color, 
+                                         sashwidth=6, bg=theme.COLOR_SASH,
                                          sashpad=0, bd=0, opaqueresize=True)
         self.paned_window.grid(row=0, column=0, sticky="nsew")
 
         # Top Section Wrapper (Dynamic ctk.CTkFrame)
-        self.top_wrapper = ctk.CTkFrame(self.paned_window, fg_color=("#f9fafb", "#111827"), corner_radius=0)
+        self.top_wrapper = ctk.CTkFrame(self.paned_window, fg_color=theme.COLOR_BG_MAIN, corner_radius=0)
         self.paned_window.add(self.top_wrapper, minsize=100)
 
         # Video Tracks Title
@@ -58,7 +58,7 @@ class CreatorFrame(ctk.CTkFrame):
         self.video_track_list.pack(fill="both", expand=True, padx=5, pady=(0, 5))
 
         # Bottom Section Wrapper (Dynamic ctk.CTkFrame)
-        self.bottom_wrapper = ctk.CTkFrame(self.paned_window, fg_color=("#f9fafb", "#111827"), corner_radius=0)
+        self.bottom_wrapper = ctk.CTkFrame(self.paned_window, fg_color=theme.COLOR_BG_MAIN, corner_radius=0)
         self.paned_window.add(self.bottom_wrapper, minsize=150)
 
         # Bottom Section Content
@@ -73,8 +73,8 @@ class CreatorFrame(ctk.CTkFrame):
         
         ctk.CTkButton(self.sub_controls, text="Add Subtitle Files", command=self.add_subs, height=35).pack(side="left", padx=(0, 10))
         ctk.CTkButton(self.sub_controls, text="Clear List", command=self.clear_subs, 
-                      fg_color="transparent", border_width=1, hover_color=["#fee2e2", "#450a0a"], 
-                      text_color=["#ef4444", "#f87171"], height=35).pack(side="left")
+                      fg_color="transparent", border_width=1, hover_color=theme.COLOR_BTN_CLEAR_HOVER,
+                      text_color=theme.COLOR_BTN_CLEAR_TEXT, height=35).pack(side="left")
 
         # Subtitle Title
         self.sub_title = ctk.CTkLabel(self.sub_container, text="Subtitles to Add", font=ctk.CTkFont(weight="bold"))

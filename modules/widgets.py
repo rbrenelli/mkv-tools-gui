@@ -63,16 +63,39 @@ class TrackListFrame(ctk.CTkScrollableFrame):
 
         self.source_filename = os.path.splitext(os.path.basename(file_path))[0]
 
-        if file_path.lower().endswith('.mkv'):
-            info = get_mkv_info(file_path)
-        else:
-            info = get_ffmpeg_info(file_path)
+        info = None
+        error_msg = None
+
+        try:
+            if file_path.lower().endswith('.mkv'):
+                info = get_mkv_info(file_path)
+            else:
+                info = get_ffmpeg_info(file_path)
+                # ffmpeg_wrapper might return None on failure currently,
+                # or we might want to standardize it later.
+                if info is None:
+                     error_msg = "Could not read file info (FFmpeg)."
+        except Exception as e:
+            error_msg = str(e)
+
+        if error_msg:
+            # Display Error
+            err_lbl = ctk.CTkLabel(self, text=f"Error: {error_msg}", text_color="red", wraplength=400)
+            err_lbl.pack(padx=10, pady=20)
+            return
 
         if not info:
+            # If info is None but no exception (shouldn't happen with updated mkv_wrapper but possible with ffmpeg)
+            err_lbl = ctk.CTkLabel(self, text="No track information found.", text_color="orange")
+            err_lbl.pack(padx=10, pady=20)
             return
 
         self.tracks = info.get("tracks", [])
         
+        if not self.tracks:
+            ctk.CTkLabel(self, text="No tracks found in this file.", text_color="gray").pack(padx=10, pady=20)
+            return
+
         for i, track in enumerate(self.tracks):
             tid = track.get("id")
             ttype = track.get("type", "unknown")

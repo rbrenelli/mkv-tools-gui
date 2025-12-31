@@ -12,7 +12,7 @@ from pathlib import Path
 class DependencyManager:
     def __init__(self):
         self.os_name = platform.system()
-        self.arch = platform.machine()
+        self.arch = platform.machine().lower()
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         # Determine installation directory
@@ -59,8 +59,8 @@ class DependencyManager:
 
         # Linux
         elif self.os_name == 'Linux':
-            arch = self.arch.lower()
-            is_arm = 'arm' in arch or 'aarch64' in arch
+            is_arm = 'arm' in self.arch or 'aarch64' in self.arch
+            is_64 = 'x86_64' in self.arch or 'amd64' in self.arch
 
             # FFmpeg
             if is_arm:
@@ -70,19 +70,34 @@ class DependencyManager:
                     'contains': ['ffmpeg', 'ffprobe']
                 }
                 # MKVToolNix for ARM Linux
+                # We don't have a reliable portable build URL for ARM
                 print(f"Warning: Automatic download of MKVToolNix for Linux ARM ({self.arch}) is not currently supported.")
-            else:
+
+            elif is_64:
                 urls['ffmpeg_pack'] = {
                     'url': 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz',
                     'type': 'tar',
                     'contains': ['ffmpeg', 'ffprobe']
                 }
-                # MKVToolNix - AppImage approach
+                # MKVToolNix - AppImage approach (Only works for x86_64)
                 urls['mkvtoolnix_pack'] = {
                     'url': 'https://mkvtoolnix.download/appimage/MKVToolNix_GUI-x86_64.AppImage',
                     'type': 'appimage',
                     'contains': ['mkvmerge', 'mkvextract']
                 }
+
+            else:
+                # 32-bit x86 (i686, i386) or other
+                print(f"Warning: Automatic download for Linux ({self.arch}) is not fully supported.")
+                # We could try to provide 32-bit ffmpeg:
+                urls['ffmpeg_pack'] = {
+                    'url': 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-i686-static.tar.xz',
+                    'type': 'tar',
+                    'contains': ['ffmpeg', 'ffprobe']
+                }
+                # But MKVToolNix AppImage for 32-bit is not available from the official site easily
+                # So we leave mkvtoolnix_pack undefined, which means it won't be downloaded.
+                # The user will have to install it via system package manager.
 
         # MacOS
         elif self.os_name == 'Darwin':
@@ -173,6 +188,13 @@ class DependencyManager:
             for pack_name, pack_info in self.urls.items():
                 if tool in pack_info['contains']:
                     packs_to_download.add(pack_name)
+
+        if not packs_to_download:
+             # Missing tools but no packs defined (e.g. 32-bit Linux for mkvmerge)
+             if progress_callback:
+                 progress_callback(1, 1, "Some dependencies are missing but no automatic download is available for this platform.")
+             print(f"Warning: Missing tools {missing} but no download URL configured.")
+             return
 
         total_steps = len(packs_to_download) * 2 # Download + Extract
         current_step = 0

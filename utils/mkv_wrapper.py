@@ -14,22 +14,33 @@ def check_dependencies():
 def get_mkv_info(mkv_path):
     """
     Run mkvmerge -J to get JSON info about the file.
-    Returns the parsed JSON object or None on failure.
+    Returns the parsed JSON object.
+    Raises FileNotFoundError if mkvmerge is missing.
+    Raises RuntimeError if mkvmerge fails (e.g. invalid file).
     """
     mkvmerge_exe = DependencyManager().get_binary_path("mkvmerge")
     if not mkvmerge_exe:
-        raise FileNotFoundError("mkvmerge not found")
+        raise FileNotFoundError("mkvmerge not found. Please ensure MKVToolNix is installed.")
 
     cmd = [mkvmerge_exe, "-J", mkv_path]
     try:
+        # Check=False allows us to handle the error code manually
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if result.returncode != 0:
-            print(f"Error running mkvmerge: {result.stderr}")
-            return None
+            error_msg = result.stderr.strip() if result.stderr else "Unknown error"
+            raise RuntimeError(f"mkvmerge failed (code {result.returncode}): {error_msg}")
+
         return json.loads(result.stdout)
+    except FileNotFoundError:
+        # This handles if subprocess fails to find the executable even if we thought we had the path
+        raise FileNotFoundError(f"Could not execute mkvmerge at: {mkvmerge_exe}")
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Failed to parse mkvmerge output: {e}")
     except Exception as e:
-        print(f"Exception running mkvmerge: {e}")
-        return None
+        # Re-raise known exceptions, wrap others
+        if isinstance(e, (RuntimeError, FileNotFoundError)):
+            raise e
+        raise RuntimeError(f"Error analyzing file: {e}")
 
 def extract_tracks(mkv_path, track_id_path_map):
     """
@@ -53,15 +64,6 @@ def extract_tracks(mkv_path, track_id_path_map):
 def mux_mkv(output_path, input_files, options=None):
     """
     Run mkvmerge to create/mux a file.
-    input_files: list of input file paths.
-    options: list of global options or per-file options (needs careful ordering).
-             For simple cases, we might want a more structured argument builder.
-    
-    For this wrapper, we'll assume 'options' contains the full command list *before* the input files,
-    or we construct the command manually in the caller.
-    
-    Actually, let's make this generic:
-    cmd_args: list of arguments to pass to mkvmerge -o output_path [cmd_args]
     """
     mkvmerge_exe = DependencyManager().get_binary_path("mkvmerge")
     if not mkvmerge_exe:
@@ -71,10 +73,6 @@ def mux_mkv(output_path, input_files, options=None):
     if options:
         cmd.extend(options)
     
-    # If input_files are provided separately, append them. 
-    # But often options need to be interleaved with input files.
-    # So if options is provided, we assume the caller handled the interleaving if necessary,
-    # OR we just append input files at the end (which is fine for simple appends).
     if input_files:
         cmd.extend(input_files)
 

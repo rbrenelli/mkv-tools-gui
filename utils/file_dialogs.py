@@ -74,7 +74,9 @@ def select_file(title="Select File", filetypes=None):
                 cmd = [_ZENITY_PATH, "--file-selection", f"--title={title}"]
                 if filetypes:
                     for name, pattern in filetypes:
-                        cmd.append(f"--file-filter={name} | {pattern}")
+                        # Fix: Ensure strict formatting for Zenity filters
+                        # "Name|Pattern Pattern" without extra spaces around pipe might be safer
+                        cmd.append(f"--file-filter={name}|{pattern}")
 
                 path = _run_linux_cmd(cmd)
                 if path: return os.path.abspath(path)
@@ -84,8 +86,6 @@ def select_file(title="Select File", filetypes=None):
                 cmd = [_KDIALOG_PATH, "--getopenfilename", os.getcwd()]
                 if filetypes:
                     # KDialog filter: "*.mkv *.mp4|Video Files"
-                    # Multiple filters separated by newline?? kdialog arg parsing can be tricky.
-                    # Usually: "Pattern|Description"
                     filters = []
                     for name, pattern in filetypes:
                         filters.append(f"{pattern}|{name}")
@@ -121,7 +121,7 @@ def select_files(title="Select Files", filetypes=None):
                 cmd = [_ZENITY_PATH, "--file-selection", "--multiple", f"--title={title}"]
                 if filetypes:
                     for name, pattern in filetypes:
-                        cmd.append(f"--file-filter={name} | {pattern}")
+                        cmd.append(f"--file-filter={name}|{pattern}")
 
                 out = _run_linux_cmd(cmd)
                 if out:
@@ -171,7 +171,7 @@ def save_file(title="Save As", initialfile=None, filetypes=None, defaultextensio
                     cmd.append(f"--filename={initialfile}")
                 if filetypes:
                     for name, pattern in filetypes:
-                        cmd.append(f"--file-filter={name} | {pattern}")
+                        cmd.append(f"--file-filter={name}|{pattern}")
 
                 path = _run_linux_cmd(cmd)
                 if path: return os.path.abspath(path)
@@ -187,9 +187,6 @@ def save_file(title="Save As", initialfile=None, filetypes=None, defaultextensio
 
                 path = _run_linux_cmd(cmd)
                 if path:
-                    # KDialog doesn't automatically append extension if user doesn't type it,
-                    # but Tkinter does if defaultextension is set.
-                    # We might want to handle that manually, but for now just return path.
                     return os.path.abspath(path)
                 if path is None: return None
 

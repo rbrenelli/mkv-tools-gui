@@ -19,6 +19,7 @@ def _find_system_binary(name):
     # First try the normal way
     path = shutil.which(name)
     if path and os.path.isfile(path):
+        print(f"DEBUG: Found {name} via shutil.which: {path}")
         return path
     
     # Fallback: check common system paths (important for PyInstaller/AppImage)
@@ -30,13 +31,17 @@ def _find_system_binary(name):
     ]
     for p in common_paths:
         if os.path.isfile(p) and os.access(p, os.X_OK):
+            print(f"DEBUG: Found {name} via fallback path: {p}")
             return p
     
+    print(f"DEBUG: {name} not found in PATH or common locations")
     return None
 
 # Detect Linux Tools (with fallback for bundled apps)
 _ZENITY_PATH = _find_system_binary("zenity")
 _KDIALOG_PATH = _find_system_binary("kdialog")
+print(f"DEBUG: _ZENITY_PATH = {_ZENITY_PATH}")
+print(f"DEBUG: _KDIALOG_PATH = {_KDIALOG_PATH}")
 
 @contextmanager
 def _tk_context():
@@ -73,17 +78,23 @@ def _run_linux_cmd(cmd):
         FallbackRequired if returncode is neither 0 nor 1, or execution fails.
     """
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        print(f"DEBUG: Running command: {cmd}")
+        # Pass through the system environment to ensure GTK/display works
+        env = os.environ.copy()
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        print(f"DEBUG: Command returned code {result.returncode}")
         if result.returncode == 0:
             return result.stdout.strip()
         elif result.returncode == 1:
             return None # User cancelled
         else:
             # Something went wrong (e.g. invalid args, crash)
-            print(f"Linux dialog tool failed with code {result.returncode}: {result.stderr}")
+            print(f"DEBUG: Linux dialog tool failed with code {result.returncode}")
+            print(f"DEBUG: stderr: {result.stderr}")
+            print(f"DEBUG: stdout: {result.stdout}")
             raise FallbackRequired()
     except Exception as e:
-        print(f"Linux dialog tool execution error: {e}")
+        print(f"DEBUG: Linux dialog tool execution error: {e}")
         raise FallbackRequired()
 
 def select_file(title="Select File", filetypes=None):

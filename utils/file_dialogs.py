@@ -79,8 +79,16 @@ def _run_linux_cmd(cmd):
     """
     try:
         print(f"DEBUG: Running command: {cmd}")
-        # Pass through the system environment to ensure GTK/display works
+        # Create clean environment for system binaries like zenity
+        # PyInstaller sets LD_LIBRARY_PATH which conflicts with system GTK libraries
         env = os.environ.copy()
+        # Remove PyInstaller's library paths to avoid GTK symbol conflicts
+        env.pop('LD_LIBRARY_PATH', None)
+        env.pop('LD_PRELOAD', None)
+        # Also clear any PyInstaller-specific paths
+        env.pop('_MEIPASS', None)
+        
+        print(f"DEBUG: Cleared LD_LIBRARY_PATH for subprocess")
         result = subprocess.run(cmd, capture_output=True, text=True, env=env)
         print(f"DEBUG: Command returned code {result.returncode}")
         if result.returncode == 0:

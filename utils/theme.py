@@ -30,3 +30,7 @@ COLOR_SASH = "#3b82f6"
 # Clear Button Colors
 COLOR_BTN_CLEAR_HOVER = ("#fee2e2", "#450a0a")  # Red 100 / Red 950
 COLOR_BTN_CLEAR_TEXT = ("#ef4444", "#f87171")   # Red 500 / Red 400
+
+# Tooltip Colors
+COLOR_TOOLTIP_BG = "#333333"
+COLOR_TOOLTIP_TEXT = "#ffffff"

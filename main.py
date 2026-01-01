@@ -7,6 +7,7 @@ from modules.extractor import ExtractorFrame
 from modules.mixer import MixerFrame
 from modules.editor import EditorFrame
 from modules.creator import CreatorFrame
+from modules.widgets import Tooltip
 from utils import theme
 from utils.dependency_manager import DependencyManager
 
@@ -48,18 +49,22 @@ class MKVToolSuite(ctk.CTk):
         self.sidebar_button_extractor = ctk.CTkButton(self.sidebar_frame, text="  Extract Tracks", 
                                                        command=self.sidebar_button_event_extractor, **btn_opts)
         self.sidebar_button_extractor.grid(row=1, column=0, padx=15, pady=5, sticky="ew")
+        Tooltip(self.sidebar_button_extractor, "Extract specific tracks (video, audio, subs) from files.")
 
         self.sidebar_button_mixer = ctk.CTkButton(self.sidebar_frame, text="  Add Subtitles",
                                                    command=self.sidebar_button_event_mixer, **btn_opts)
         self.sidebar_button_mixer.grid(row=2, column=0, padx=15, pady=5, sticky="ew")
+        Tooltip(self.sidebar_button_mixer, "Add external subtitles to an existing video.")
 
         self.sidebar_button_editor = ctk.CTkButton(self.sidebar_frame, text="  Edit Tracks",
                                                     command=self.sidebar_button_event_editor, **btn_opts)
         self.sidebar_button_editor.grid(row=3, column=0, padx=15, pady=5, sticky="ew")
+        Tooltip(self.sidebar_button_editor, "Modify track properties like language, default, and forced flags.")
 
         self.sidebar_button_creator = ctk.CTkButton(self.sidebar_frame, text="  Create Video",
                                                      command=self.sidebar_button_event_creator, **btn_opts)
         self.sidebar_button_creator.grid(row=4, column=0, padx=15, pady=5, sticky="ew")
+        Tooltip(self.sidebar_button_creator, "Merge video and subtitle files into a new container.")
 
         # Appearance Mode
         self.appearance_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")

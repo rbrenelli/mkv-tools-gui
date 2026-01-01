@@ -68,21 +68,15 @@ class TrackListFrame(ctk.CTkScrollableFrame):
 
         try:
             if file_path.lower().endswith('.mkv'):
-                print(f"DEBUG: Loading MKV info for: {file_path}")
                 info = get_mkv_info(file_path)
-                print(f"DEBUG: MKV info loaded, tracks count: {len(info.get('tracks', [])) if info else 'None'}")
             else:
-                print(f"DEBUG: Loading FFmpeg info for: {file_path}")
                 info = get_ffmpeg_info(file_path)
                 # ffmpeg_wrapper might return None on failure currently,
                 # or we might want to standardize it later.
                 if info is None:
                      error_msg = "Could not read file info (FFmpeg)."
-                else:
-                    print(f"DEBUG: FFmpeg info loaded, tracks count: {len(info.get('tracks', []))}")
         except Exception as e:
             error_msg = str(e)
-            print(f"DEBUG: Exception loading tracks: {error_msg}")
 
         if error_msg:
             # Display Error

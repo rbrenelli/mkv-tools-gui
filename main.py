@@ -75,16 +75,11 @@ class MKVToolSuite(ctk.CTk):
         self.appearance_mode_optionemenu.pack(pady=10)
         self.appearance_mode_optionemenu.set(ctk.get_appearance_mode())
 
-        # Create frames for each module
-        # Pass background color to modules if needed, but transparent is better
-        self.extractor_frame = ExtractorFrame(self)
-        self.mixer_frame = MixerFrame(self)
-        self.editor_frame = EditorFrame(self)
-        self.creator_frame = CreatorFrame(self)
-
-        # Ensure all frames are transparent to show root background
-        for frame in [self.extractor_frame, self.mixer_frame, self.editor_frame, self.creator_frame]:
-            frame.configure(fg_color="transparent")
+        # Initialize frame placeholders for lazy loading
+        self.extractor_frame = None
+        self.mixer_frame = None
+        self.editor_frame = None
+        self.creator_frame = None
 
         # Select default frame
         self.select_frame_by_name("extractor")
@@ -167,19 +162,37 @@ class MKVToolSuite(ctk.CTk):
             else:
                 btn.configure(fg_color="transparent", text_color=theme.COLOR_BTN_TEXT, hover_color=theme.COLOR_BTN_HOVER)
 
-        # show selected frame
-        frames = {
-            "extractor": self.extractor_frame,
-            "mixer": self.mixer_frame,
-            "editor": self.editor_frame,
-            "creator": self.creator_frame
-        }
-        
-        for n, frame in frames.items():
-            if n == name:
-                frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=(20, 10))
-            else:
-                frame.grid_forget()
+        # Lazy load the selected frame if needed
+        if name == "extractor":
+            if self.extractor_frame is None:
+                self.extractor_frame = ExtractorFrame(self)
+                self.extractor_frame.configure(fg_color="transparent")
+            self.extractor_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=(20, 10))
+        elif name == "mixer":
+            if self.mixer_frame is None:
+                self.mixer_frame = MixerFrame(self)
+                self.mixer_frame.configure(fg_color="transparent")
+            self.mixer_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=(20, 10))
+        elif name == "editor":
+            if self.editor_frame is None:
+                self.editor_frame = EditorFrame(self)
+                self.editor_frame.configure(fg_color="transparent")
+            self.editor_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=(20, 10))
+        elif name == "creator":
+            if self.creator_frame is None:
+                self.creator_frame = CreatorFrame(self)
+                self.creator_frame.configure(fg_color="transparent")
+            self.creator_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=(20, 10))
+
+        # Hide other frames
+        if name != "extractor" and self.extractor_frame is not None:
+            self.extractor_frame.grid_forget()
+        if name != "mixer" and self.mixer_frame is not None:
+            self.mixer_frame.grid_forget()
+        if name != "editor" and self.editor_frame is not None:
+            self.editor_frame.grid_forget()
+        if name != "creator" and self.creator_frame is not None:
+            self.creator_frame.grid_forget()
 
     def sidebar_button_event_extractor(self):
         self.select_frame_by_name("extractor")

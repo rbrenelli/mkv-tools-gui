@@ -4,6 +4,51 @@ from utils.ffmpeg_wrapper import get_ffmpeg_info
 from utils import theme
 import os
 
+class Tooltip:
+    """
+    A unified tooltip class for the application.
+    Displays a floating window with text when hovering over a widget.
+    """
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip_window = None
+        self.widget.bind("<Enter>", self.show)
+        self.widget.bind("<Leave>", self.hide)
+        self.widget.bind("<ButtonPress>", self.hide)
+
+    def show(self, event=None):
+        if self.tooltip_window or not self.text:
+            return
+
+        # Calculate position (offset from widget)
+        # Using winfo_rootx/y ensures correct position relative to screen
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+
+        # Create tooltip window
+        # Using CTkToplevel for better theme integration, but might need care with decorations
+        self.tooltip_window = ctk.CTkToplevel(self.widget)
+        self.tooltip_window.wm_overrideredirect(True)
+        self.tooltip_window.wm_geometry(f"+{x}+{y}")
+        self.tooltip_window.attributes("-topmost", True)
+
+        # Label inside
+        label = ctk.CTkLabel(self.tooltip_window, text=self.text, corner_radius=6,
+                             fg_color=theme.COLOR_TOOLTIP_BG,
+                             text_color=theme.COLOR_TOOLTIP_TEXT,
+                             padx=10, pady=5, font=ctk.CTkFont(size=12))
+        label.pack()
+
+        # Update geometry to fit label
+        # Toplevel sizes can be tricky without update, but pack usually handles it
+        # If needed: self.tooltip_window.update_idletasks()
+
+    def hide(self, event=None):
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+            self.tooltip_window = None
+
 class TrackListFrame(ctk.CTkScrollableFrame):
     def __init__(self, master, languages=None, extract_mode=False, default_checked=True, **kwargs):
         # Remove label_text from kwargs to move it outside
@@ -115,6 +160,7 @@ class TrackListFrame(ctk.CTkScrollableFrame):
             keep_var = ctk.BooleanVar(value=self.default_checked)
             chk = ctk.CTkCheckBox(row, text="", variable=keep_var, width=20)
             chk.pack(side="left", padx=(10, 5))
+            Tooltip(chk, "Include this track in output")
             
             if self.extract_mode:
                 # -- EXTRACT MODE: Info + Output Filename --
@@ -159,6 +205,7 @@ class TrackListFrame(ctk.CTkScrollableFrame):
 
                 def_chk = ctk.CTkCheckBox(row, text="Default", variable=default_var, command=on_default_click, width=70)
                 def_chk.pack(side="left", padx=10)
+                Tooltip(def_chk, "Set as default track for this language")
                 
                 # Language Dropdown
                 current_lang_str = self.languages[-1]
@@ -362,6 +409,7 @@ class FileListFrame(ctk.CTkScrollableFrame):
         def_chk = ctk.CTkCheckBox(row, text="Def.", variable=default_var, 
                                   command=lambda: on_default_click_msg(default_var), width=50)
         def_chk.pack(side="left", padx=5)
+        Tooltip(def_chk, "Set as default track")
         
         row_data = {
             "path": path,

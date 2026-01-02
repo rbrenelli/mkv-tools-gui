@@ -75,16 +75,8 @@ class MKVToolSuite(ctk.CTk):
         self.appearance_mode_optionemenu.pack(pady=10)
         self.appearance_mode_optionemenu.set(ctk.get_appearance_mode())
 
-        # Create frames for each module
-        # Pass background color to modules if needed, but transparent is better
-        self.extractor_frame = ExtractorFrame(self)
-        self.mixer_frame = MixerFrame(self)
-        self.editor_frame = EditorFrame(self)
-        self.creator_frame = CreatorFrame(self)
-
-        # Ensure all frames are transparent to show root background
-        for frame in [self.extractor_frame, self.mixer_frame, self.editor_frame, self.creator_frame]:
-            frame.configure(fg_color="transparent")
+        # Dictionary to store frames for lazy loading
+        self.frames = {}
 
         # Select default frame
         self.select_frame_by_name("extractor")
@@ -167,15 +159,23 @@ class MKVToolSuite(ctk.CTk):
             else:
                 btn.configure(fg_color="transparent", text_color=theme.COLOR_BTN_TEXT, hover_color=theme.COLOR_BTN_HOVER)
 
-        # show selected frame
-        frames = {
-            "extractor": self.extractor_frame,
-            "mixer": self.mixer_frame,
-            "editor": self.editor_frame,
-            "creator": self.creator_frame
-        }
-        
-        for n, frame in frames.items():
+        # Lazy load frame if not exists
+        if name not in self.frames:
+            if name == "extractor":
+                self.frames[name] = ExtractorFrame(self)
+            elif name == "mixer":
+                self.frames[name] = MixerFrame(self)
+            elif name == "editor":
+                self.frames[name] = EditorFrame(self)
+            elif name == "creator":
+                self.frames[name] = CreatorFrame(self)
+
+            # Configure frame to be transparent
+            if name in self.frames:
+                self.frames[name].configure(fg_color="transparent")
+
+        # show selected frame and hide others
+        for n, frame in self.frames.items():
             if n == name:
                 frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=(20, 10))
             else:

@@ -32,6 +32,43 @@ class TrackListFrame(ctk.CTkScrollableFrame):
         # Bind scroll events
         self._bind_mouse_wheel(self)
 
+        # Show empty state initially
+        self._show_empty_state()
+
+    def _get_content_frame(self):
+        """Returns the internal frame where content is actually placed."""
+        # Create a temporary widget to find the parent frame if needed
+        # Or usually ctk exposes it. Let's try to be robust.
+        # But standard ctk usage: self is the outer frame.
+        # If we pack into self, ctk reparents to self.scrollable_frame (if it exists)
+        # or we can assume there is a property.
+        # Let's inspect using a temporary widget which is 100% reliable for CTk.
+        try:
+            return self.scrollable_frame
+        except AttributeError:
+            # Fallback if the version of CTk is different or structure varies
+            pass
+
+        # Fallback: Create a widget and check its master
+        temp = ctk.CTkLabel(self)
+        frame = temp.master
+        temp.destroy()
+        return frame
+
+    def _clear_content(self):
+        """Safely clears user content from the internal scrollable frame."""
+        content_frame = self._get_content_frame()
+        for widget in content_frame.winfo_children():
+            widget.destroy()
+
+    def _show_empty_state(self):
+        """Displays a placeholder message when no file is loaded."""
+        self._clear_content()
+
+        msg = "No video loaded. Select a source file to view tracks."
+        lbl = ctk.CTkLabel(self, text=msg, text_color="gray", wraplength=400)
+        lbl.pack(padx=20, pady=50)
+
     def _bind_mouse_wheel(self, widget):
         """Recursively bind mouse wheel events to a widget and all its children."""
         widget.bind("<MouseWheel>", self._on_mouse_wheel)
@@ -52,14 +89,19 @@ class TrackListFrame(ctk.CTkScrollableFrame):
             
     def load_tracks(self, file_path):
         # Clear existing
-        for widget in self.winfo_children():
-            widget.destroy()
+        self._clear_content()
         self.track_widgets = {}
         self.tracks = []
         self.generated_filenames = set()
 
         if not file_path:
+            self._show_empty_state()
             return
+
+        # Show Loading State
+        loading_lbl = ctk.CTkLabel(self, text="Loading tracks...", text_color="gray")
+        loading_lbl.pack(pady=40)
+        self.update() # Force UI update before heavy operation
 
         self.source_filename = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -77,6 +119,9 @@ class TrackListFrame(ctk.CTkScrollableFrame):
                      error_msg = "Could not read file info (FFmpeg)."
         except Exception as e:
             error_msg = str(e)
+
+        # Clear loading indicator
+        self._clear_content()
 
         if error_msg:
             # Display Error

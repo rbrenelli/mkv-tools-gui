@@ -3,12 +3,15 @@ import os
 import sys
 import tkinter as tk
 import threading
-from modules.extractor import ExtractorFrame
-from modules.mixer import MixerFrame
-from modules.editor import EditorFrame
-from modules.creator import CreatorFrame
+from typing import TYPE_CHECKING
 from utils import theme
 from utils.dependency_manager import DependencyManager
+
+if TYPE_CHECKING:
+    from modules.extractor import ExtractorFrame
+    from modules.mixer import MixerFrame
+    from modules.editor import EditorFrame
+    from modules.creator import CreatorFrame
 
 class MKVToolSuite(ctk.CTk):
     def __init__(self):
@@ -162,12 +165,16 @@ class MKVToolSuite(ctk.CTk):
         # Lazy load frame if not exists
         if name not in self.frames:
             if name == "extractor":
+                from modules.extractor import ExtractorFrame
                 self.frames[name] = ExtractorFrame(self)
             elif name == "mixer":
+                from modules.mixer import MixerFrame
                 self.frames[name] = MixerFrame(self)
             elif name == "editor":
+                from modules.editor import EditorFrame
                 self.frames[name] = EditorFrame(self)
             elif name == "creator":
+                from modules.creator import CreatorFrame
                 self.frames[name] = CreatorFrame(self)
 
             # Configure frame to be transparent

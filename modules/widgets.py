@@ -3,6 +3,67 @@ from utils.mkv_wrapper import get_mkv_info
 from utils.ffmpeg_wrapper import get_ffmpeg_info
 from utils import theme
 import os
+import tkinter as tk
+
+class ToolTip:
+    """
+    A simple tooltip utility for CustomTkinter widgets.
+    """
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tip_window = None
+        self.id = None
+
+        # Bindings for mouse and keyboard accessibility
+        self.widget.bind("<Enter>", self.schedule)
+        self.widget.bind("<Leave>", self.hide)
+        self.widget.bind("<ButtonPress>", self.hide)
+        self.widget.bind("<FocusIn>", self.schedule)
+        self.widget.bind("<FocusOut>", self.hide)
+
+    def schedule(self, event=None):
+        self.unschedule()
+        self.id = self.widget.after(500, self.show)
+
+    def unschedule(self):
+        if self.id:
+            self.widget.after_cancel(self.id)
+        self.id = None
+
+    def show(self, event=None):
+        if self.tip_window or not self.text:
+            return
+
+        try:
+            x = self.widget.winfo_rootx() + 20
+            y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        except Exception:
+            return
+
+        self.tip_window = tk.Toplevel(self.widget)
+        self.tip_window.wm_overrideredirect(True)
+        self.tip_window.wm_geometry(f"+{x}+{y}")
+        self.tip_window.attributes('-topmost', True)
+
+        # Use theme colors if possible, else high contrast defaults
+        bg_color = theme.COLOR_BG_SIDEBAR[1] # Use dark theme sidebar color for tooltip background
+        fg_color = "white"
+
+        try:
+             self.tip_window.configure(bg=bg_color)
+        except:
+             pass
+
+        label = ctk.CTkLabel(self.tip_window, text=self.text, fg_color=bg_color, text_color=fg_color,
+                             corner_radius=6, width=0, height=0, padx=8, pady=4, font=("Arial", 11))
+        label.pack()
+
+    def hide(self, event=None):
+        self.unschedule()
+        if self.tip_window:
+            self.tip_window.destroy()
+            self.tip_window = None
 
 class TrackListFrame(ctk.CTkScrollableFrame):
     def __init__(self, master, languages=None, extract_mode=False, default_checked=True, **kwargs):
@@ -204,6 +265,7 @@ class TrackListFrame(ctk.CTkScrollableFrame):
 
                 def_chk = ctk.CTkCheckBox(row, text="Default", variable=default_var, command=on_default_click, width=70)
                 def_chk.pack(side="left", padx=10)
+                ToolTip(def_chk, "Set as Default Track")
                 
                 # Language Dropdown
                 current_lang_str = self.languages[-1]
@@ -407,6 +469,7 @@ class FileListFrame(ctk.CTkScrollableFrame):
         def_chk = ctk.CTkCheckBox(row, text="Def.", variable=default_var, 
                                   command=lambda: on_default_click_msg(default_var), width=50)
         def_chk.pack(side="left", padx=5)
+        ToolTip(def_chk, "Set as Default Track")
         
         row_data = {
             "path": path,

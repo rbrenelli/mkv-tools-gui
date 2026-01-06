@@ -36,7 +36,7 @@ class ExtractorFrame(ctk.CTkFrame):
         self.tracks_label.grid(row=2, column=0, padx=10, pady=(10, 5), sticky="w")
 
         # Track List
-        self.track_list = TrackListFrame(self, extract_mode=True, default_checked=False)
+        self.track_list = TrackListFrame(self, extract_mode=True, default_checked=False, on_open=self.browse_file)
         self.track_list.grid(row=3, column=0, padx=10, pady=(0, 10), sticky="nsew")
         
         # Selection Buttons

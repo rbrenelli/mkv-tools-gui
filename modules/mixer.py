@@ -52,7 +52,7 @@ class MixerFrame(ctk.CTkFrame):
         self.base_tracks_title = ctk.CTkLabel(self.top_wrapper, text="Original Video Tracks", font=ctk.CTkFont(weight="bold"))
         self.base_tracks_title.pack(padx=10, pady=(5, 5), anchor="w")
         
-        self.base_track_list = TrackListFrame(self.top_wrapper)
+        self.base_track_list = TrackListFrame(self.top_wrapper, on_open=self.browse_video)
         self.base_track_list.pack(fill="both", expand=True, padx=5, pady=(0, 5))
 
         # Bottom Section Wrapper

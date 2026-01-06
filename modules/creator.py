@@ -51,7 +51,7 @@ class CreatorFrame(ctk.CTkFrame):
         self.video_tracks_title.pack(padx=10, pady=(5, 5), anchor="w")
 
         # Top Section: Video Tracks
-        self.video_track_list = TrackListFrame(self.top_wrapper)
+        self.video_track_list = TrackListFrame(self.top_wrapper, on_open=self.browse_video)
         self.video_track_list.pack(fill="both", expand=True, padx=5, pady=(0, 5))
 
         # Bottom Section Wrapper

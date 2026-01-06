@@ -66,13 +66,14 @@ class ToolTip:
             self.tip_window = None
 
 class TrackListFrame(ctk.CTkScrollableFrame):
-    def __init__(self, master, languages=None, extract_mode=False, default_checked=True, **kwargs):
+    def __init__(self, master, languages=None, extract_mode=False, default_checked=True, on_open=None, **kwargs):
         # Remove label_text from kwargs to move it outside
         kwargs.pop("label_text", None)
         kwargs.pop("label_font", None)
         
         self.extract_mode = extract_mode
         self.default_checked = default_checked
+        self.on_open = on_open
 
         # Material Design Polish: Give it a surface look
         # Use a slightly lighter/distinct gray for the list background to create "depth"
@@ -128,7 +129,14 @@ class TrackListFrame(ctk.CTkScrollableFrame):
 
         msg = "No video loaded. Select a source file to view tracks."
         lbl = ctk.CTkLabel(self, text=msg, text_color="gray", wraplength=400)
-        lbl.pack(padx=20, pady=50)
+        lbl.pack(padx=20, pady=(50, 10))
+
+        if self.on_open:
+            btn = ctk.CTkButton(self, text="Select Video File", command=self.on_open)
+            btn.pack(padx=20, pady=(0, 50))
+        else:
+            # Add extra padding if no button
+            lbl.pack(padx=20, pady=50)
 
     def _bind_mouse_wheel(self, widget):
         """Recursively bind mouse wheel events to a widget and all its children."""

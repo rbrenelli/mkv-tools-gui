@@ -4,6 +4,33 @@ from utils.ffmpeg_wrapper import get_ffmpeg_info
 from utils import theme
 import os
 
+class CTkTooltip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip = None
+        self.widget.bind("<Enter>", self.show)
+        self.widget.bind("<Leave>", self.hide)
+
+    def show(self, event=None):
+        if self.tooltip: return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + 20
+        self.tooltip = ctk.CTkToplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        self.tooltip.geometry(f"+{x}+{y}")
+        self.tooltip.lift()
+
+        # Use a high contrast dark gray
+        label = ctk.CTkLabel(self.tooltip, text=self.text, fg_color="#1f2937", text_color="#ffffff",
+                             corner_radius=4, padx=8, pady=4, font=ctk.CTkFont(size=12))
+        label.pack()
+
+    def hide(self, event=None):
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
+
 class TrackListFrame(ctk.CTkScrollableFrame):
     def __init__(self, master, languages=None, extract_mode=False, default_checked=True, **kwargs):
         # Remove label_text from kwargs to move it outside
@@ -160,6 +187,7 @@ class TrackListFrame(ctk.CTkScrollableFrame):
             keep_var = ctk.BooleanVar(value=self.default_checked)
             chk = ctk.CTkCheckBox(row, text="", variable=keep_var, width=20)
             chk.pack(side="left", padx=(10, 5))
+            CTkTooltip(chk, "Select this track")
             
             if self.extract_mode:
                 # -- EXTRACT MODE: Info + Output Filename --
@@ -178,6 +206,7 @@ class TrackListFrame(ctk.CTkScrollableFrame):
                 ctk.CTkLabel(row, text="Output:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left", padx=5)
                 out_name_entry = ctk.CTkEntry(row, textvariable=out_name_var, height=28, placeholder_text="Output Filename")
                 out_name_entry.pack(side="left", fill="x", expand=True, padx=(0, 10), pady=2)
+                CTkTooltip(out_name_entry, "Output filename (extension auto-detected)")
 
                 # Store minimal data
                 self.track_widgets[tid] = {
@@ -204,6 +233,7 @@ class TrackListFrame(ctk.CTkScrollableFrame):
 
                 def_chk = ctk.CTkCheckBox(row, text="Default", variable=default_var, command=on_default_click, width=70)
                 def_chk.pack(side="left", padx=10)
+                CTkTooltip(def_chk, "Set as default track for this type")
                 
                 # Language Dropdown
                 current_lang_str = self.languages[-1]
@@ -407,6 +437,7 @@ class FileListFrame(ctk.CTkScrollableFrame):
         def_chk = ctk.CTkCheckBox(row, text="Def.", variable=default_var, 
                                   command=lambda: on_default_click_msg(default_var), width=50)
         def_chk.pack(side="left", padx=5)
+        CTkTooltip(def_chk, "Set as default track")
         
         row_data = {
             "path": path,

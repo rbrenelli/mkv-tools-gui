@@ -79,7 +79,7 @@ class MixerFrame(ctk.CTkFrame):
         self.sub_title.grid(row=1, column=0, padx=10, pady=(5, 5), sticky="w")
 
         # Subtitle List
-        self.sub_list_frame = FileListFrame(self.sub_container)
+        self.sub_list_frame = FileListFrame(self.sub_container, on_add=self.add_subs)
         self.sub_list_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
 
         # Output Options Frame (Transparency)

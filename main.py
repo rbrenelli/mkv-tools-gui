@@ -113,5 +113,20 @@ class App(ctk.CTk):
              ModalDialog(self, "Missing Dependencies", msg)
 
 if __name__ == "__main__":
-    app = App()
-    app.mainloop()
+    try:
+        app = App()
+        app.mainloop()
+    except Exception as e:
+        import traceback
+        with open("error_log.txt", "w") as f:
+            f.write("Crash Report:\n")
+            traceback.print_exc(file=f)
+        # Try to show a native error dialog if possible, or just exit
+        try:
+            import tkinter.messagebox
+            root = tkinter.Tk()
+            root.withdraw()
+            tkinter.messagebox.showerror("Critical Error", f"Application failed to start.\n\nError: {e}\n\nSee error_log.txt for details.")
+        except:
+            pass
+        sys.exit(1)

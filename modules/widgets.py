@@ -414,7 +414,7 @@ class FileListFrame(ctk.CTkScrollableFrame):
     A unified list for adding external files (subtitles, etc.)
     Mimics the visual style of TrackListFrame (alternating rows, background).
     """
-    def __init__(self, master, languages=None, **kwargs):
+    def __init__(self, master, languages=None, on_add=None, **kwargs):
         kwargs.pop("label_text", None)
         # Unified background: Gray 200 / Gray 800
         super().__init__(master, label_text="", corner_radius=6, border_width=1, 
@@ -425,8 +425,43 @@ class FileListFrame(ctk.CTkScrollableFrame):
              "deu (German)", "ita (Italian)", "jpn (Japanese)", "chi (Chinese)", 
              "rus (Russian)", "kor (Korean)", "ara (Arabic)", "hin (Hindi)", "und (Undefined)"
         ]
+        self.on_add = on_add
         self.rows = []
         self._bind_mouse_wheel(self)
+        self._show_empty_state()
+
+    def _get_content_frame(self):
+        """Returns the internal frame where content is actually placed."""
+        try:
+            return self.scrollable_frame
+        except AttributeError:
+            pass
+
+        # Fallback
+        temp = ctk.CTkLabel(self)
+        frame = temp.master
+        temp.destroy()
+        return frame
+
+    def _clear_content(self):
+        """Safely clears user content from the internal scrollable frame."""
+        content_frame = self._get_content_frame()
+        for widget in content_frame.winfo_children():
+            widget.destroy()
+
+    def _show_empty_state(self):
+        """Displays a placeholder message when no file is loaded."""
+        self._clear_content()
+
+        msg = "No external files added."
+        lbl = ctk.CTkLabel(self, text=msg, text_color="gray", wraplength=400)
+        lbl.pack(padx=20, pady=(50, 10))
+
+        if self.on_add:
+            btn = ctk.CTkButton(self, text="Add Subtitle Files", command=self.on_add)
+            btn.pack(padx=20, pady=(0, 50))
+        else:
+            lbl.pack(padx=20, pady=50)
 
     def _bind_mouse_wheel(self, widget):
         widget.bind("<MouseWheel>", self._on_mouse_wheel)
@@ -447,6 +482,10 @@ class FileListFrame(ctk.CTkScrollableFrame):
         Returns a dict of widget variables.
         """
         import os
+
+        # If list is empty (showing empty state), clear it first!
+        if not self.rows:
+            self._clear_content()
         
         i = len(self.rows)
         stripe_color = theme.COLOR_LIST_STRIPE_EVEN if i % 2 == 0 else theme.COLOR_LIST_STRIPE_ODD
@@ -487,10 +526,10 @@ class FileListFrame(ctk.CTkScrollableFrame):
             "widget": row,
             "lang_menu": lang_menu
         }
+
         self.rows.append(row_data)
         return row_data
 
     def clear(self):
-        for item in self.rows:
-            item["widget"].destroy()
+        self._show_empty_state()
         self.rows = []

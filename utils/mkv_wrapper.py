@@ -4,6 +4,9 @@ import shutil
 import os
 from utils.dependency_manager import DependencyManager
 
+# Cache: path -> (mtime, size, data)
+_mkv_info_cache = {}
+
 def check_dependencies():
     """Check if mkvmerge and mkvextract are available."""
     dm = DependencyManager()
@@ -18,6 +21,21 @@ def get_mkv_info(mkv_path):
     Raises FileNotFoundError if mkvmerge is missing.
     Raises RuntimeError if mkvmerge fails (e.g. invalid file).
     """
+    # Check cache first
+    try:
+        stat_result = os.stat(mkv_path)
+        mtime = stat_result.st_mtime
+        size = stat_result.st_size
+
+        if mkv_path in _mkv_info_cache:
+            cached_mtime, cached_size, cached_data = _mkv_info_cache[mkv_path]
+            if cached_mtime == mtime and cached_size == size:
+                return cached_data
+    except OSError:
+        # If we can't stat the file (e.g. permission error or doesn't exist),
+        # we skip caching and let mkvmerge handle the error reporting.
+        pass
+
     mkvmerge_exe = DependencyManager().get_binary_path("mkvmerge")
     if not mkvmerge_exe:
         raise FileNotFoundError("mkvmerge not found. Please ensure MKVToolNix is installed.")
@@ -30,7 +48,13 @@ def get_mkv_info(mkv_path):
             error_msg = result.stderr.strip() if result.stderr else "Unknown error"
             raise RuntimeError(f"mkvmerge failed (code {result.returncode}): {error_msg}")
 
-        return json.loads(result.stdout)
+        data = json.loads(result.stdout)
+
+        # Update cache if we successfully stat'ed earlier
+        if 'mtime' in locals() and 'size' in locals():
+            _mkv_info_cache[mkv_path] = (mtime, size, data)
+
+        return data
     except FileNotFoundError:
         # This handles if subprocess fails to find the executable even if we thought we had the path
         raise FileNotFoundError(f"Could not execute mkvmerge at: {mkvmerge_exe}")

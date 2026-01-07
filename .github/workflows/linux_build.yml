@@ -1,0 +1,52 @@
+
+name: Build Linux AppImage
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mkvtoolnix ffmpeg python3-tk
+
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build Binary with PyInstaller
+      run: |
+        # Collect customtkinter data is crucial
+        # Using --onefile to make a single binary
+        pyinstaller --noconfirm --onefile --windowed --name "MKVToolSuite" \
+          --collect-all customtkinter \
+          --add-data "assets:assets" \
+          main.py
+
+    - name: Prepare AppDir for AppImage (Optional but recommended for distribution)
+      # Creating a simple AppImage structure manually or just using the binary
+      # Here we upload the single file binary which is easiest for now
+      run: |
+        ls -l dist/
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: MKVToolSuite-Linux
+        path: dist/MKVToolSuite

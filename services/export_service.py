@@ -30,8 +30,9 @@ class ExportService:
     def _extract_mkv(self, source, tracks, output_dir, on_progress, on_complete):
         mkvextract = self.deps.get_tool_path("mkvextract")
 
-        # mkvextract tracks input.mkv ID:output ID:output ...
-        cmd = [mkvextract, "tracks", source.filepath]
+        # mkvextract input.mkv tracks ID:output ID:output ...
+        # Correct syntax: mkvextract <source-filename> <mode> <extraction-spec>
+        cmd = [mkvextract, source.filepath, "tracks"]
 
         for track in tracks:
             out_name = track.output_filename

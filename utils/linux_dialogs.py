@@ -16,6 +16,9 @@ class LinuxDialogs:
                 if result.returncode == 0:
                     path = result.stdout.strip()
                     if path: return path
+                # Exit code 1 means Cancel/Closed, do not fallback
+                if result.returncode == 1:
+                    return ""
             except:
                 pass
 
@@ -28,6 +31,9 @@ class LinuxDialogs:
                 if result.returncode == 0:
                     path = result.stdout.strip()
                     if path: return path
+                # Exit code 1 means Cancel
+                if result.returncode == 1:
+                    return ""
             except:
                 pass
 
@@ -55,6 +61,8 @@ class LinuxDialogs:
                 if result.returncode == 0:
                     path = result.stdout.strip()
                     if path: return path
+                if result.returncode == 1:
+                    return ""
             except:
                 pass
 
@@ -78,6 +86,8 @@ class LinuxDialogs:
                 if result.returncode == 0:
                     path = result.stdout.strip()
                     if path: return path
+                if result.returncode == 1:
+                    return ""
             except:
                 pass
 
@@ -96,6 +106,8 @@ class LinuxDialogs:
                         if defaultextension and not os.path.splitext(path)[1]:
                             path += defaultextension
                         return path
+                if result.returncode == 1:
+                    return ""
             except:
                 pass
 
@@ -111,6 +123,8 @@ class LinuxDialogs:
                         if defaultextension and not os.path.splitext(path)[1]:
                             path += defaultextension
                         return path
+                if result.returncode == 1:
+                    return ""
              except:
                  pass
 

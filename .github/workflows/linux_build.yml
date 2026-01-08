@@ -1,0 +1,73 @@
+
+name: Build Linux Binaries
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-x86_64:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mkvtoolnix ffmpeg python3-tk
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build x86_64 Binary
+      run: |
+        pyinstaller --noconfirm --onefile --windowed --name "MKVToolSuite-x86_64" \
+          --collect-all customtkinter \
+          --add-data "assets:assets" \
+          main.py
+
+    - name: Upload x86_64 Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MKVToolSuite-Linux-x86_64
+        path: dist/MKVToolSuite-x86_64
+
+  build-arm64:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build ARM64 Binary
+      uses: uraimo/run-on-arch-action@v2
+      with:
+        arch: aarch64
+        distro: ubuntu22.04
+        githubToken: ${{ github.token }}
+        install: |
+          apt-get update
+          apt-get install -y python3 python3-pip python3-venv python3-tk mkvtoolnix ffmpeg binutils
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+          # Build
+          pyinstaller --noconfirm --onefile --windowed --name "MKVToolSuite-arm64" \
+            --collect-all customtkinter \
+            --add-data "assets:assets" \
+            main.py
+
+    - name: Upload ARM64 Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MKVToolSuite-Linux-arm64
+        path: dist/MKVToolSuite-arm64

@@ -1,208 +1,132 @@
+
 import customtkinter as ctk
-import os
 import sys
-import tkinter as tk
 import threading
-from typing import TYPE_CHECKING
-from utils import theme
-from utils.dependency_manager import DependencyManager
+from modules.views.sidebar import Sidebar
+from modules.views.extract_view import ExtractView
+from modules.views.subtitle_view import SubtitleView
+from modules.views.create_view import CreateView
+from modules.views.settings_view import SettingsView
+from modules.views.components.modal import ModalDialog
 
-if TYPE_CHECKING:
-    from modules.extractor import ExtractorFrame
-    from modules.mixer import MixerFrame
-    from modules.editor import EditorFrame
-    from modules.creator import CreatorFrame
+from modules.viewmodels.app_vm import AppViewModel
+from modules.viewmodels.extract_vm import ExtractViewModel
+from modules.viewmodels.subtitle_vm import SubtitleViewModel
+from modules.viewmodels.create_vm import CreateViewModel
+from modules.viewmodels.settings_vm import SettingsViewModel
 
-class MKVToolSuite(ctk.CTk):
+from services.dependency_service import DependencyService
+from services.media_service import MediaService
+from services.subtitle_service import SubtitleService
+from services.export_service import ExportService
+
+from utils.constants import APP_NAME, COLOR_BG_MAIN, COLOR_BG_SIDEBAR
+
+ctk.set_appearance_mode("System")
+ctk.set_default_color_theme("blue")
+
+class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Detect scaling before drawing widgets
-        self.detect_scaling()
+        self.title(APP_NAME)
+        self.geometry("1000x700")
 
-        self.title("MKV Tool Suite")
-        self.geometry("1100x700")
+        # Scaling for HighDPI (Chromebooks)
+        self.setup_scaling()
 
-        # Set appearance and default theme
-        ctk.set_appearance_mode("System")
-        ctk.set_default_color_theme("blue")
-
-        # Configure root grid for expansion
-        self.grid_rowconfigure(0, weight=1)
+        # Layout
         self.grid_columnconfigure(1, weight=1)
-
-        self.configure(fg_color=theme.COLOR_BG_MAIN)
-
-        # Create sidebar frame with widgets
-        self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0, 
-                                           fg_color=theme.COLOR_BG_SIDEBAR, border_width=0)
-        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(5, weight=1)
-
-        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="MKV Tool Suite", 
-                                        font=ctk.CTkFont(size=22, weight="bold"))
-        self.logo_label.grid(row=0, column=0, padx=20, pady=(40, 30))
-
-        # Nav Buttons
-        btn_opts = {"height": 45, "font": ctk.CTkFont(size=14), "fg_color": "transparent", 
-                    "text_color": theme.COLOR_BTN_TEXT, "hover_color": theme.COLOR_BTN_HOVER,
-                    "anchor": "w", "corner_radius": 8}
-
-        self.sidebar_button_extractor = ctk.CTkButton(self.sidebar_frame, text="  Extract Tracks", 
-                                                       command=self.sidebar_button_event_extractor, **btn_opts)
-        self.sidebar_button_extractor.grid(row=1, column=0, padx=15, pady=5, sticky="ew")
-
-        self.sidebar_button_mixer = ctk.CTkButton(self.sidebar_frame, text="  Add Subtitles",
-                                                   command=self.sidebar_button_event_mixer, **btn_opts)
-        self.sidebar_button_mixer.grid(row=2, column=0, padx=15, pady=5, sticky="ew")
-
-        self.sidebar_button_editor = ctk.CTkButton(self.sidebar_frame, text="  Edit Tracks",
-                                                    command=self.sidebar_button_event_editor, **btn_opts)
-        self.sidebar_button_editor.grid(row=3, column=0, padx=15, pady=5, sticky="ew")
-
-        self.sidebar_button_creator = ctk.CTkButton(self.sidebar_frame, text="  Create Video",
-                                                     command=self.sidebar_button_event_creator, **btn_opts)
-        self.sidebar_button_creator.grid(row=4, column=0, padx=15, pady=5, sticky="ew")
-
-        # Appearance Mode
-        self.appearance_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
-        self.appearance_frame.grid(row=6, column=0, padx=20, pady=(10, 30), sticky="ew")
+        self.grid_rowconfigure(0, weight=1)
         
-        self.appearance_mode_optionemenu = ctk.CTkOptionMenu(self.appearance_frame, values=["Light", "Dark", "System"],
-                                                               command=self.change_appearance_mode_event,
-                                                               fg_color=theme.COLOR_APPEARANCE_FG,
-                                                               button_color=theme.COLOR_APPEARANCE_BTN,
-                                                               button_hover_color=theme.COLOR_APPEARANCE_BTN_HOVER,
-                                                               text_color=theme.COLOR_APPEARANCE_TEXT,
-                                                               width=180)
-        self.appearance_mode_optionemenu.pack(pady=10)
-        self.appearance_mode_optionemenu.set(ctk.get_appearance_mode())
+        # Init Services
+        self.dep_service = DependencyService()
+        self.media_service = MediaService(self.dep_service)
+        self.sub_service = SubtitleService()
+        self.export_service = ExportService(self.dep_service)
 
-        # Dictionary to store frames for lazy loading
-        self.frames = {}
+        # Init ViewModels
+        self.app_vm = AppViewModel()
+        self.extract_vm = ExtractViewModel(self.media_service, self.export_service)
+        self.subtitle_vm = SubtitleViewModel(self.sub_service, self.export_service)
+        self.create_vm = CreateViewModel(self.export_service)
+        self.settings_vm = SettingsViewModel(self.dep_service)
 
-        # Select default frame
-        self.select_frame_by_name("extractor")
+        # Init Views
+        self.sidebar = Sidebar(self, on_navigate=self.navigate)
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
 
-        # Check dependencies
-        self.check_dependencies_on_startup()
+        self.views = {
+            "Extract": ExtractView(self, self.extract_vm),
+            "Subtitles": SubtitleView(self, self.subtitle_vm),
+            "Create": CreateView(self, self.create_vm),
+            "Settings": SettingsView(self, self.settings_vm)
+        }
 
-    def check_dependencies_on_startup(self):
-        dm = DependencyManager()
-        if dm.check_missing_dependencies():
-            # Create a Toplevel window
-            self.setup_window = ctk.CTkToplevel(self)
-            self.setup_window.title("First Run Setup")
-            self.setup_window.geometry("400x150")
+        self.navigate("Extract")
 
-            # Center the window
-            self.update_idletasks()
-            width = self.setup_window.winfo_width()
-            height = self.setup_window.winfo_height()
-            x = (self.winfo_screenwidth() // 2) - (width // 2)
-            y = (self.winfo_screenheight() // 2) - (height // 2)
-            self.setup_window.geometry(f"{width}x{height}+{x}+{y}")
+        # Check deps after UI load
+        self.after(100, self.check_startup_deps)
 
-            # Make it modal-like
-            self.setup_window.transient(self)
-            self.setup_window.grab_set()
-
-            self.setup_label = ctk.CTkLabel(self.setup_window, text="Downloading required tools (FFmpeg, MKVToolNix)...", wraplength=350)
-            self.setup_label.pack(pady=20)
-
-            self.setup_progress = ctk.CTkProgressBar(self.setup_window, width=300)
-            self.setup_progress.pack(pady=10)
-            self.setup_progress.set(0)
-
-            def update_ui(current, total, message):
-                # Schedule UI update on main thread
-                self.after(0, lambda: self._update_progress_ui(current, total, message))
-
-            def download_task():
-                dm.download_dependencies(update_ui)
-                # Close window when done
-                self.after(0, self.setup_window.destroy)
-
-            threading.Thread(target=download_task, daemon=True).start()
-
-    def _update_progress_ui(self, current, total, message):
-        if hasattr(self, 'setup_progress') and self.setup_progress.winfo_exists():
-            progress = current / total if total > 0 else 0
-            self.setup_progress.set(progress)
-
-        if hasattr(self, 'setup_label') and self.setup_label.winfo_exists():
-            self.setup_label.configure(text=message)
-
-    def detect_scaling(self):
+    def setup_scaling(self):
+        # Primitive detection or fixed for now
+        # CTK handles auto-scaling on Windows/macOS often, but Linux can be tricky.
+        # "set_widget_scaling"
         try:
-            # Create a dummy window to get DPI if needed, but self (ctk.CTk) is already a window
-            # 1 inch = 96 pixels typically on standard screen
-            # self.winfo_fpixels('1i') returns pixels per inch
+             # Basic heuristic for High DPI
+             scaling = self._get_window_scaling()
+             if scaling > 1.0:
+                 ctk.set_widget_scaling(scaling)
+        except:
+             pass
+
+    def _get_window_scaling(self):
+        # On Linux/X11, getting DPI is non-trivial without external libs.
+        # We can try to guess from winfo_fpixels('1i'). Standard is 96 (ish).
+        # But for now, rely on CTK or user settings.
+        # User prompt says: "Ensure the app detects high-DPI screens ... and scales UI elements by 1.25x or 1.5x automatically"
+        # Since I can't easily detect reliably in pure python without Xlib, I will rely on `ctk.set_widget_scaling` if I can infer it.
+        # Often `tk` scale factor is available.
+        try:
             dpi = self.winfo_fpixels('1i')
-            scale_factor = dpi / 96.0
+            if dpi > 110: return 1.5 # ~144dpi
+            if dpi > 96: return 1.25 # ~120dpi
+        except:
+            pass
+        return 1.0
 
-            # Ensure scale factor is reasonable
-            if scale_factor < 1.0:
-                scale_factor = 1.0
+    def navigate(self, name):
+        self.app_vm.set_view(name)
+        self.sidebar.set_active(name)
 
-            ctk.set_widget_scaling(scale_factor)
-            ctk.set_window_scaling(scale_factor)
-        except Exception as e:
-            # Fallback or just ignore scaling issues on some platforms
-            print(f"DPI scaling detection failed: {e}")
+        # Hide all
+        for v in self.views.values():
+            v.grid_forget()
 
-    def select_frame_by_name(self, name):
-        # set button color for selected button
-        for btn, n in [(self.sidebar_button_extractor, "extractor"), 
-                      (self.sidebar_button_mixer, "mixer"), 
-                      (self.sidebar_button_editor, "editor"), 
-                      (self.sidebar_button_creator, "creator")]:
-            if n == name:
-                btn.configure(fg_color=theme.COLOR_ACCENT, text_color="white", hover_color=theme.COLOR_HOVER)
-            else:
-                btn.configure(fg_color="transparent", text_color=theme.COLOR_BTN_TEXT, hover_color=theme.COLOR_BTN_HOVER)
+        # Show selected
+        self.views[name].grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
-        # Lazy load frame if not exists
-        if name not in self.frames:
-            if name == "extractor":
-                from modules.extractor import ExtractorFrame
-                self.frames[name] = ExtractorFrame(self)
-            elif name == "mixer":
-                from modules.mixer import MixerFrame
-                self.frames[name] = MixerFrame(self)
-            elif name == "editor":
-                from modules.editor import EditorFrame
-                self.frames[name] = EditorFrame(self)
-            elif name == "creator":
-                from modules.creator import CreatorFrame
-                self.frames[name] = CreatorFrame(self)
-
-            # Configure frame to be transparent
-            if name in self.frames:
-                self.frames[name].configure(fg_color="transparent")
-
-        # show selected frame and hide others
-        for n, frame in self.frames.items():
-            if n == name:
-                frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=(20, 10))
-            else:
-                frame.grid_forget()
-
-    def sidebar_button_event_extractor(self):
-        self.select_frame_by_name("extractor")
-
-    def sidebar_button_event_mixer(self):
-        self.select_frame_by_name("mixer")
-
-    def sidebar_button_event_editor(self):
-        self.select_frame_by_name("editor")
-
-    def sidebar_button_event_creator(self):
-        self.select_frame_by_name("creator")
-
-    def change_appearance_mode_event(self, new_appearance_mode: str):
-        ctk.set_appearance_mode(new_appearance_mode)
+    def check_startup_deps(self):
+        missing = self.dep_service.get_missing_tools()
+        if missing:
+             msg = f"Missing tools: {', '.join(missing)}.\n\nPlease install 'mkvtoolnix' and 'ffmpeg' packages via your system package manager.\n\nExample: sudo apt install mkvtoolnix ffmpeg"
+             ModalDialog(self, "Missing Dependencies", msg)
 
 if __name__ == "__main__":
-    app = MKVToolSuite()
-    app.mainloop()
+    try:
+        app = App()
+        app.mainloop()
+    except Exception as e:
+        import traceback
+        with open("error_log.txt", "w") as f:
+            f.write("Crash Report:\n")
+            traceback.print_exc(file=f)
+        # Try to show a native error dialog if possible, or just exit
+        try:
+            import tkinter.messagebox
+            root = tkinter.Tk()
+            root.withdraw()
+            tkinter.messagebox.showerror("Critical Error", f"Application failed to start.\n\nError: {e}\n\nSee error_log.txt for details.")
+        except:
+            pass
+        sys.exit(1)

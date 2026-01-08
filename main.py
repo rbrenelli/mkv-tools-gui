@@ -85,7 +85,7 @@ class MKVToolSuite(ctk.CTk):
         self.select_frame_by_name("extractor")
 
         # Check dependencies
-        self.check_dependencies_on_startup()
+        self.after(200, self.check_dependencies_on_startup)
 
     def check_dependencies_on_startup(self):
         dm = DependencyManager()

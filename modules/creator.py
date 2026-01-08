@@ -186,7 +186,10 @@ class CreatorFrame(ctk.CTkFrame):
                      if s["default_var"] != var:
                          s["default_var"].set(False)
 
-        row_data = self.sub_list_frame.add_file_row(path, on_default_click)
+        def on_remove(data):
+            self.remove_sub(data)
+
+        row_data = self.sub_list_frame.add_file_row(path, on_default_click, on_remove)
         
         # Auto-fill logic
         detected_lang = self.detect_language(path)
@@ -209,6 +212,12 @@ class CreatorFrame(ctk.CTkFrame):
     def clear_subs(self):
         self.sub_list_frame.clear()
         self.sub_files = []
+        self.check_ready()
+
+    def remove_sub(self, row_data):
+        if row_data in self.sub_files:
+            self.sub_files.remove(row_data)
+        self.sub_list_frame.remove_row(row_data)
         self.check_ready()
 
     def check_ready(self):

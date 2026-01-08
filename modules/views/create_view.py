@@ -48,12 +48,15 @@ class CreateView(ctk.CTkFrame):
         self.progress_modal = None
 
     def refresh_list(self):
-        for widget in self.scroll_frame.winfo_children():
-            widget.destroy()
+        if hasattr(self, "_track_widgets"):
+            for w in self._track_widgets:
+                w.destroy()
+        self._track_widgets = []
 
         for i, item in enumerate(self.vm.inputs):
             f = ctk.CTkFrame(self.scroll_frame)
             f.pack(fill="x", pady=2)
+            self._track_widgets.append(f)
 
             ctk.CTkLabel(f, text=item["path"]).pack(side="left", padx=5)
             ctk.CTkButton(f, text="X", width=30, fg_color="red", command=lambda idx=i: self.vm.remove_input(idx)).pack(side="right", padx=5)

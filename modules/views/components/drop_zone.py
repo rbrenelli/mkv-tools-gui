@@ -23,5 +23,5 @@ class FileDropZone(ctk.CTkFrame):
             filename = LinuxDialogs.askopenfilename(title="Select File")
             if filename:
                 self.on_drop(filename)
-        except:
-            pass
+        except Exception as e:
+            print(f"Error opening file dialog: {e}")

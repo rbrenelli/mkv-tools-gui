@@ -39,16 +39,26 @@ class ExtractView(ctk.CTkFrame):
         self.progress_modal = None
 
     def on_file_loaded(self, media_file):
-        # Clear existing
-        for widget in self.scroll_frame.winfo_children():
-            widget.destroy()
+        # Clear existing content safely
+        # We use a tracked list of widgets to avoid destroying internal CTkScrollableFrame components
+        # (scrollbar, canvas) which happens if we blindly iterate winfo_children().
+        if hasattr(self, "_track_widgets"):
+            for w in self._track_widgets:
+                w.destroy()
+        self._track_widgets = []
+        if hasattr(self, "_track_widgets"):
+            for w in self._track_widgets:
+                w.destroy()
+        self._track_widgets = []
 
         self.drop_zone.label.configure(text=f"Loaded: {media_file.filename}")
 
         # Headers
-        headers = ["Select", "ID", "Type", "Lang", "Name", "Output Name"]
+        headers = ["Select", "ID", "Type", "Lang", "Name", "Codec", "Output Name"]
         for i, h in enumerate(headers):
-            ctk.CTkLabel(self.scroll_frame, text=h, font=("Roboto", 12, "bold")).grid(row=0, column=i, padx=5, pady=5, sticky="w")
+            lbl = ctk.CTkLabel(self.scroll_frame, text=h, font=("Roboto", 12, "bold"))
+            lbl.grid(row=0, column=i, padx=5, pady=5, sticky="w")
+            self._track_widgets.append(lbl)
 
         # Rows
         for i, track in enumerate(media_file.tracks):
@@ -64,16 +74,33 @@ class ExtractView(ctk.CTkFrame):
                 command=lambda t=track.id, v=var: self.vm.toggle_track_selection(t, v.get())
             )
             chk.grid(row=r, column=0, padx=5, pady=2)
+            self._track_widgets.append(chk)
 
-            ctk.CTkLabel(self.scroll_frame, text=str(track.id)).grid(row=r, column=1, padx=5)
-            ctk.CTkLabel(self.scroll_frame, text=track.type).grid(row=r, column=2, padx=5)
-            ctk.CTkLabel(self.scroll_frame, text=track.language).grid(row=r, column=3, padx=5)
-            ctk.CTkLabel(self.scroll_frame, text=track.name or "-").grid(row=r, column=4, padx=5)
+            l1 = ctk.CTkLabel(self.scroll_frame, text=str(track.id))
+            l1.grid(row=r, column=1, padx=5)
+            self._track_widgets.append(l1)
+
+            l2 = ctk.CTkLabel(self.scroll_frame, text=track.type)
+            l2.grid(row=r, column=2, padx=5)
+            self._track_widgets.append(l2)
+
+            l3 = ctk.CTkLabel(self.scroll_frame, text=track.language)
+            l3.grid(row=r, column=3, padx=5)
+            self._track_widgets.append(l3)
+
+            l4 = ctk.CTkLabel(self.scroll_frame, text=track.name or "-")
+            l4.grid(row=r, column=4, padx=5)
+            self._track_widgets.append(l4)
+
+            l_codec = ctk.CTkLabel(self.scroll_frame, text=track.codec or "-")
+            l_codec.grid(row=r, column=5, padx=5)
+            self._track_widgets.append(l_codec)
 
             # Output Name Entry
             entry = ctk.CTkEntry(self.scroll_frame, width=200)
-            entry.grid(row=r, column=5, padx=5)
+            entry.grid(row=r, column=6, padx=5)
             entry.bind("<FocusOut>", lambda e, t=track.id, ent=entry: self.vm.set_track_output_name(t, ent.get()))
+            self._track_widgets.append(entry)
 
     def on_extract(self):
         output_dir = LinuxDialogs.askdirectory()

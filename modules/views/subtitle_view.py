@@ -49,12 +49,15 @@ class SubtitleView(ctk.CTkFrame):
             self.video_label.configure(text=filename)
 
     def refresh_list(self):
-        for widget in self.scroll_frame.winfo_children():
-            widget.destroy()
+        if hasattr(self, "_track_widgets"):
+            for w in self._track_widgets:
+                w.destroy()
+        self._track_widgets = []
 
         for i, sub in enumerate(self.vm.subtitles):
             f = ctk.CTkFrame(self.scroll_frame)
             f.pack(fill="x", pady=2)
+            self._track_widgets.append(f)
 
             ctk.CTkLabel(f, text=sub.filename).pack(side="left", padx=5)
             ctk.CTkLabel(f, text=sub.language_name).pack(side="left", padx=5)

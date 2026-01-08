@@ -1,5 +1,5 @@
 
-name: Build Linux AppImage
+name: Build Linux Binaries
 
 on:
   push:
@@ -8,9 +8,8 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  build-x86_64:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
 
@@ -19,34 +18,56 @@ jobs:
       with:
         python-version: "3.11"
 
-    - name: Install System Dependencies
+    - name: Install Dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y mkvtoolnix ffmpeg python3-tk
-
-    - name: Install Python Dependencies
-      run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: Build Binary with PyInstaller
+    - name: Build x86_64 Binary
       run: |
-        # Collect customtkinter data is crucial
-        # Using --onefile to make a single binary
-        pyinstaller --noconfirm --onefile --windowed --name "MKVToolSuite" \
+        pyinstaller --noconfirm --onefile --windowed --name "MKVToolSuite-x86_64" \
           --collect-all customtkinter \
           --add-data "assets:assets" \
           main.py
 
-    - name: Prepare AppDir for AppImage (Optional but recommended for distribution)
-      # Creating a simple AppImage structure manually or just using the binary
-      # Here we upload the single file binary which is easiest for now
-      run: |
-        ls -l dist/
-
-    - name: Upload Artifact
+    - name: Upload x86_64 Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: MKVToolSuite-Linux
-        path: dist/MKVToolSuite
+        name: MKVToolSuite-Linux-x86_64
+        path: dist/MKVToolSuite-x86_64
+
+  build-arm64:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build ARM64 Binary
+      uses: uraimo/run-on-arch-action@v2
+      with:
+        arch: aarch64
+        distro: ubuntu22.04
+        githubToken: ${{ github.token }}
+        install: |
+          apt-get update
+          apt-get install -y python3 python3-pip python3-venv python3-tk mkvtoolnix ffmpeg binutils
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+          # Build
+          pyinstaller --noconfirm --onefile --windowed --name "MKVToolSuite-arm64" \
+            --collect-all customtkinter \
+            --add-data "assets:assets" \
+            main.py
+
+    - name: Upload ARM64 Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MKVToolSuite-Linux-arm64
+        path: dist/MKVToolSuite-arm64

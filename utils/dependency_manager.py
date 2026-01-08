@@ -143,8 +143,14 @@ class DependencyManager:
         # We don't exit early if bin_dir doesn't exist, because we might find tools in system PATH.
 
         for tool in self.tools:
+            # Check cache first
+            if tool in self._binary_cache:
+                continue
+
             # 1. Check System PATH
-            if shutil.which(tool):
+            system_path = shutil.which(tool)
+            if system_path:
+                self._binary_cache[tool] = system_path
                 continue
 
             # 2. Check managed bin directory
@@ -153,7 +159,9 @@ class DependencyManager:
                 tool_name += '.exe'
 
             tool_path = os.path.join(self.bin_dir, tool_name)
-            if not os.path.exists(tool_path):
+            if os.path.exists(tool_path):
+                self._binary_cache[tool] = tool_path
+            else:
                 missing.append(tool)
 
         return missing

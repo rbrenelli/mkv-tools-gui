@@ -35,8 +35,17 @@ def _find_system_binary(name):
     return None
 
 # Detect Linux Tools (with fallback for bundled apps)
-_ZENITY_PATH = _find_system_binary("zenity")
-_KDIALOG_PATH = _find_system_binary("kdialog")
+_ZENITY_PATH = None
+_KDIALOG_PATH = None
+_TOOLS_DETECTED = False
+
+def _detect_tools():
+    global _ZENITY_PATH, _KDIALOG_PATH, _TOOLS_DETECTED
+    if _TOOLS_DETECTED:
+        return
+    _ZENITY_PATH = _find_system_binary("zenity")
+    _KDIALOG_PATH = _find_system_binary("kdialog")
+    _TOOLS_DETECTED = True
 
 @contextmanager
 def _tk_context():
@@ -98,6 +107,7 @@ def select_file(title="Select File", filetypes=None):
     Returns absolute path string or None.
     """
     if sys.platform.startswith("linux"):
+        _detect_tools()
         try:
             if _ZENITY_PATH:
                 cmd = [_ZENITY_PATH, "--file-selection", f"--title={title}"]
@@ -143,6 +153,7 @@ def select_files(title="Select Files", filetypes=None):
     Returns list of strings or empty list.
     """
     if sys.platform.startswith("linux"):
+        _detect_tools()
         try:
             if _ZENITY_PATH:
                 # Zenity multiple returns paths separated by | by default
@@ -193,6 +204,7 @@ def save_file(title="Save As", initialfile=None, filetypes=None, defaultextensio
     Returns absolute path string or None.
     """
     if sys.platform.startswith("linux"):
+        _detect_tools()
         try:
             if _ZENITY_PATH:
                 # Note: --confirm-overwrite is deprecated in zenity 4.x but harmless
@@ -244,6 +256,7 @@ def select_directory(title="Select Directory"):
     Returns absolute path string or None.
     """
     if sys.platform.startswith("linux"):
+        _detect_tools()
         try:
             if _ZENITY_PATH:
                 cmd = [_ZENITY_PATH, "--file-selection", "--directory", f"--title={title}"]

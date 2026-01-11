@@ -188,7 +188,12 @@ class MixerFrame(ctk.CTkFrame):
                      if s["default_var"] != var:
                          s["default_var"].set(False)
 
-        row_data = self.sub_list_frame.add_file_row(path, on_default_click)
+        def on_remove(row_data):
+            if row_data in self.sub_files:
+                self.sub_files.remove(row_data)
+            self.check_ready()
+
+        row_data = self.sub_list_frame.add_file_row(path, on_default_click, on_remove=on_remove)
         
         detected_lang = self.detect_language(path)
         initial_lang = detected_lang if detected_lang else self.languages[0]

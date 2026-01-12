@@ -440,10 +440,11 @@ class FileListFrame(ctk.CTkScrollableFrame):
         elif event.num == 5: self._parent_canvas.yview_scroll(1, "units")
         else: self._parent_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
-    def add_file_row(self, path, on_default_click_msg):
+    def add_file_row(self, path, on_default_click_msg, on_remove=None):
         """
         Adds a row for a subtitle file.
         on_default_click_msg: callback when 'default' box is clicked.
+        on_remove: callback when remove button is clicked.
         Returns a dict of widget variables.
         """
         import os
@@ -487,8 +488,31 @@ class FileListFrame(ctk.CTkScrollableFrame):
             "widget": row,
             "lang_menu": lang_menu
         }
+
+        # Remove Button
+        if on_remove:
+            btn_remove = ctk.CTkButton(row, text="✕", width=25, height=25,
+                                       fg_color="transparent",
+                                       text_color=theme.COLOR_BTN_CLEAR_TEXT,
+                                       hover_color=theme.COLOR_BTN_CLEAR_HOVER,
+                                       command=lambda: self._remove_row(row_data, on_remove))
+            btn_remove.pack(side="left", padx=5)
+            ToolTip(btn_remove, "Remove File")
+
         self.rows.append(row_data)
         return row_data
+
+    def _remove_row(self, row_data, callback):
+        """Internal method to handle row removal."""
+        if callback:
+            callback(row_data)
+
+        # Destroy widget
+        row_data["widget"].destroy()
+
+        # Remove from internal list
+        if row_data in self.rows:
+            self.rows.remove(row_data)
 
     def clear(self):
         for item in self.rows:

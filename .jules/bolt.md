@@ -1,3 +1,3 @@
-## 2025-01-02 - Lazy Loading UI Frames
-**Learning:** Initializing all UI components at startup in a multi-tab application significantly impacts startup time, even if those components are not immediately visible.
-**Action:** Implement lazy loading for UI tabs/frames. Instantiate them only when the user first navigates to them. This spreads the initialization cost and speeds up the initial launch.
+## 2024-05-23 - Deferred Startup Dependency Check
+**Learning:** In `tkinter`/`customtkinter` apps, heavy synchronous operations in `__init__` (like `shutil.which` calls) block the initial window rendering.
+**Action:** Always use `self.after(ms, callback)` to schedule non-critical startup checks, allowing the main loop to start and the window to appear immediately ("First Paint").

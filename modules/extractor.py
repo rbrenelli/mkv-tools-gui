@@ -88,6 +88,15 @@ class ExtractorFrame(ctk.CTkFrame):
             self.selected_out_dir = d
             self.out_dir_var.set(d)
 
+    @staticmethod
+    def _get_safe_output_path(output_dir, filename):
+        """
+        Sanitizes filename to prevent path traversal and joins with output_dir.
+        """
+        # Sentinel: Prevent path traversal by using basename
+        safe_filename = os.path.basename(filename)
+        return os.path.join(output_dir, safe_filename)
+
     def extract_tracks(self):
         # Get mapping from TrackListFrame
         track_map_raw = self.track_list.get_extraction_map()
@@ -104,7 +113,7 @@ class ExtractorFrame(ctk.CTkFrame):
             if not filename:
                 messagebox.showwarning("Warning", f"Filename missing for Track ID {tid}")
                 return
-            final_track_map[tid] = os.path.join(output_dir, filename)
+            final_track_map[tid] = self._get_safe_output_path(output_dir, filename)
 
         if self.video_path.lower().endswith('.mkv'):
             success, msg = extract_tracks(self.video_path, final_track_map)

@@ -2,6 +2,7 @@ import os
 import sys
 import shutil
 import subprocess
+import functools
 import tkinter as tk
 from tkinter import filedialog
 from contextlib import contextmanager
@@ -34,9 +35,13 @@ def _find_system_binary(name):
     
     return None
 
-# Detect Linux Tools (with fallback for bundled apps)
-_ZENITY_PATH = _find_system_binary("zenity")
-_KDIALOG_PATH = _find_system_binary("kdialog")
+@functools.lru_cache(maxsize=1)
+def _get_zenity_path():
+    return _find_system_binary("zenity")
+
+@functools.lru_cache(maxsize=1)
+def _get_kdialog_path():
+    return _find_system_binary("kdialog")
 
 @contextmanager
 def _tk_context():
@@ -99,8 +104,9 @@ def select_file(title="Select File", filetypes=None):
     """
     if sys.platform.startswith("linux"):
         try:
-            if _ZENITY_PATH:
-                cmd = [_ZENITY_PATH, "--file-selection", f"--title={title}"]
+            zenity = _get_zenity_path()
+            if zenity:
+                cmd = [zenity, "--file-selection", f"--title={title}"]
                 if filetypes:
                     for name, pattern in filetypes:
                         # Zenity 4.x format: "Name | Pattern1 Pattern2"
@@ -110,8 +116,9 @@ def select_file(title="Select File", filetypes=None):
                 if path: return os.path.abspath(path)
                 if path is None: return None # Cancelled
 
-            elif _KDIALOG_PATH:
-                cmd = [_KDIALOG_PATH, "--getopenfilename", os.getcwd()]
+            kdialog = _get_kdialog_path()
+            if kdialog:
+                cmd = [kdialog, "--getopenfilename", os.getcwd()]
                 if filetypes:
                     # KDialog filter: "*.mkv *.mp4|Video Files"
                     filters = []
@@ -144,9 +151,10 @@ def select_files(title="Select Files", filetypes=None):
     """
     if sys.platform.startswith("linux"):
         try:
-            if _ZENITY_PATH:
+            zenity = _get_zenity_path()
+            if zenity:
                 # Zenity multiple returns paths separated by | by default
-                cmd = [_ZENITY_PATH, "--file-selection", "--multiple", f"--title={title}"]
+                cmd = [zenity, "--file-selection", "--multiple", f"--title={title}"]
                 if filetypes:
                     for name, pattern in filetypes:
                         # Zenity 4.x format: "Name | Pattern1 Pattern2"
@@ -159,9 +167,10 @@ def select_files(title="Select Files", filetypes=None):
                     return [os.path.abspath(p) for p in paths if p]
                 if out is None: return [] # Cancelled
 
-            elif _KDIALOG_PATH:
+            kdialog = _get_kdialog_path()
+            if kdialog:
                 # KDialog multiple
-                cmd = [_KDIALOG_PATH, "--getopenfilename", os.getcwd(), "--multiple", "--separate-output"]
+                cmd = [kdialog, "--getopenfilename", os.getcwd(), "--multiple", "--separate-output"]
                 if filetypes:
                     filters = []
                     for name, pattern in filetypes:
@@ -194,9 +203,10 @@ def save_file(title="Save As", initialfile=None, filetypes=None, defaultextensio
     """
     if sys.platform.startswith("linux"):
         try:
-            if _ZENITY_PATH:
+            zenity = _get_zenity_path()
+            if zenity:
                 # Note: --confirm-overwrite is deprecated in zenity 4.x but harmless
-                cmd = [_ZENITY_PATH, "--file-selection", "--save", f"--title={title}"]
+                cmd = [zenity, "--file-selection", "--save", f"--title={title}"]
                 if initialfile:
                     cmd.append(f"--filename={initialfile}")
                 if filetypes:
@@ -208,13 +218,14 @@ def save_file(title="Save As", initialfile=None, filetypes=None, defaultextensio
                 if path: return os.path.abspath(path)
                 if path is None: return None
 
-            elif _KDIALOG_PATH:
-                cmd = [_KDIALOG_PATH, "--getsavefilename", os.getcwd()]
+            kdialog = _get_kdialog_path()
+            if kdialog:
+                cmd = [kdialog, "--getsavefilename", os.getcwd()]
                 if filetypes:
-                     filters = []
-                     for name, pattern in filetypes:
-                         filters.append(f"{pattern}|{name}")
-                     cmd.append("\n".join(filters))
+                    filters = []
+                    for name, pattern in filetypes:
+                        filters.append(f"{pattern}|{name}")
+                    cmd.append("\n".join(filters))
 
                 path = _run_linux_cmd(cmd)
                 if path:
@@ -245,14 +256,16 @@ def select_directory(title="Select Directory"):
     """
     if sys.platform.startswith("linux"):
         try:
-            if _ZENITY_PATH:
-                cmd = [_ZENITY_PATH, "--file-selection", "--directory", f"--title={title}"]
+            zenity = _get_zenity_path()
+            if zenity:
+                cmd = [zenity, "--file-selection", "--directory", f"--title={title}"]
                 path = _run_linux_cmd(cmd)
                 if path: return os.path.abspath(path)
                 if path is None: return None
 
-            elif _KDIALOG_PATH:
-                cmd = [_KDIALOG_PATH, "--getexistingdirectory", os.getcwd()]
+            kdialog = _get_kdialog_path()
+            if kdialog:
+                cmd = [kdialog, "--getexistingdirectory", os.getcwd()]
                 path = _run_linux_cmd(cmd)
                 if path: return os.path.abspath(path)
                 if path is None: return None

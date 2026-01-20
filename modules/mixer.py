@@ -213,6 +213,12 @@ class MixerFrame(ctk.CTkFrame):
         self.sub_files.append(row_data)
 
     def clear_subs(self):
+        if not self.sub_files:
+            return
+
+        if not messagebox.askyesno("Confirm Clear", "Are you sure you want to remove all subtitle files?", parent=self):
+            return
+
         self.sub_list_frame.clear()
         self.sub_files = []
         self.check_ready()
@@ -239,10 +245,18 @@ class MixerFrame(ctk.CTkFrame):
 
         output_path = os.path.join(out_dir, out_name)
 
-        if out_fmt == "mkv":
-            self._process_mkv(output_path)
-        else:
-            self._process_mp4(output_path)
+        # Loading state
+        orig_text = self.process_btn.cget("text")
+        self.process_btn.configure(text="Processing...", state="disabled")
+        self.update_idletasks()
+
+        try:
+            if out_fmt == "mkv":
+                self._process_mkv(output_path)
+            else:
+                self._process_mp4(output_path)
+        finally:
+            self.process_btn.configure(text=orig_text, state="normal")
 
     def _process_mkv(self, output_path):
         mkvmerge = shutil.which("mkvmerge")

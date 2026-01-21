@@ -7,6 +7,7 @@ import subprocess
 from modules.widgets import TrackListFrame, FileListFrame
 from utils import theme
 from utils.dependency_manager import DependencyManager
+from utils.security import sanitize_filename
 
 class CreatorFrame(ctk.CTkFrame):
     def __init__(self, master):
@@ -232,6 +233,9 @@ class CreatorFrame(ctk.CTkFrame):
         if not out_name or not out_dir:
             messagebox.showwarning("Warning", "Please specify output directory and filename.")
             return
+
+        # Sanitize filename
+        out_name = sanitize_filename(out_name)
 
         # Ensure extension
         if not out_name.lower().endswith(f".{out_fmt}"):

@@ -4,6 +4,9 @@ import shutil
 import os
 from utils.dependency_manager import DependencyManager
 
+# Cache: path -> (mtime, size, data)
+_ffmpeg_info_cache = {}
+
 def check_ffmpeg():
     """
     Returns True if ffmpeg and ffprobe are available in the system PATH.
@@ -18,6 +21,19 @@ def get_ffmpeg_info(file_path):
     Use ffprobe to get info about a video file and return it in a format
     compatible with the app's existing MKV structure.
     """
+    # Check cache first
+    try:
+        stat_result = os.stat(file_path)
+        mtime = stat_result.st_mtime
+        size = stat_result.st_size
+
+        if file_path in _ffmpeg_info_cache:
+            cached_mtime, cached_size, cached_data = _ffmpeg_info_cache[file_path]
+            if cached_mtime == mtime and cached_size == size:
+                return cached_data
+    except OSError:
+        pass
+
     ffprobe_exe = DependencyManager().get_binary_path("ffprobe")
     if not ffprobe_exe:
         raise FileNotFoundError("ffprobe not found")
@@ -40,22 +56,6 @@ def get_ffmpeg_info(file_path):
         data = json.loads(result.stdout)
 
         # Transform ffprobe JSON to expected app structure
-        # Expected structure:
-        # {
-        #    "tracks": [
-        #        {
-        #            "id": <int>,
-        #            "type": <str> ("video", "audio", "subtitles"),
-        #            "properties": {
-        #                "codec_id": <str>,
-        #                "language": <str>,
-        #                "track_name": <str>
-        #            }
-        #        },
-        #        ...
-        #    ]
-        # }
-
         tracks = []
         if "streams" in data:
             for stream in data["streams"]:
@@ -69,8 +69,7 @@ def get_ffmpeg_info(file_path):
                 elif codec_type == "subtitle":
                     track_type = "subtitles"
                 else:
-                    # Skip unknown types (like data or attachments if any, unless we want to support them)
-                    # The prompt only mentions video, audio, subtitles.
+                    # Skip unknown types
                     continue
 
                 # Extract properties
@@ -90,7 +89,13 @@ def get_ffmpeg_info(file_path):
                 }
                 tracks.append(track_entry)
 
-        return {"tracks": tracks}
+        final_data = {"tracks": tracks}
+
+        # Update cache
+        if 'mtime' in locals() and 'size' in locals():
+            _ffmpeg_info_cache[file_path] = (mtime, size, final_data)
+
+        return final_data
 
     except Exception as e:
         print(f"Exception running ffprobe: {e}")

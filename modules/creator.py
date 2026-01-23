@@ -7,6 +7,7 @@ import subprocess
 from modules.widgets import TrackListFrame, FileListFrame
 from utils import theme
 from utils.dependency_manager import DependencyManager
+from utils.security import sanitize_filename
 
 class CreatorFrame(ctk.CTkFrame):
     def __init__(self, master):
@@ -236,6 +237,9 @@ class CreatorFrame(ctk.CTkFrame):
         # Ensure extension
         if not out_name.lower().endswith(f".{out_fmt}"):
             out_name += f".{out_fmt}"
+
+        # Sanitize filename
+        out_name = sanitize_filename(out_name)
 
         output_path = os.path.join(out_dir, out_name)
 

@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import subprocess
 from tkinter import PanedWindow
-from modules.widgets import TrackListFrame, FileListFrame
+from modules.widgets import TrackListFrame, FileListFrame, processing_state
 from utils import theme
 from utils.dependency_manager import DependencyManager
 
@@ -239,10 +239,11 @@ class MixerFrame(ctk.CTkFrame):
 
         output_path = os.path.join(out_dir, out_name)
 
-        if out_fmt == "mkv":
-            self._process_mkv(output_path)
-        else:
-            self._process_mp4(output_path)
+        with processing_state(self.process_btn):
+            if out_fmt == "mkv":
+                self._process_mkv(output_path)
+            else:
+                self._process_mp4(output_path)
 
     def _process_mkv(self, output_path):
         mkvmerge = shutil.which("mkvmerge")

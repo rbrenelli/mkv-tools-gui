@@ -4,7 +4,7 @@ from utils import file_dialogs
 import os
 import shutil
 import subprocess
-from modules.widgets import TrackListFrame, FileListFrame
+from modules.widgets import TrackListFrame, FileListFrame, processing_state
 from utils import theme
 from utils.dependency_manager import DependencyManager
 
@@ -239,10 +239,11 @@ class CreatorFrame(ctk.CTkFrame):
 
         output_path = os.path.join(out_dir, out_name)
 
-        if out_fmt == "mkv":
-            self._create_mkv(output_path)
-        else:
-            self._create_mp4(output_path)
+        with processing_state(self.create_btn):
+            if out_fmt == "mkv":
+                self._create_mkv(output_path)
+            else:
+                self._create_mp4(output_path)
 
     def _create_mkv(self, output_path):
         mkvmerge = DependencyManager().get_binary_path("mkvmerge")

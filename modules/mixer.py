@@ -9,6 +9,7 @@ from tkinter import PanedWindow
 from modules.widgets import TrackListFrame, FileListFrame
 from utils import theme
 from utils.dependency_manager import DependencyManager
+from utils.validation import is_safe_filename
 
 class MixerFrame(ctk.CTkFrame):
     def __init__(self, master):
@@ -236,6 +237,10 @@ class MixerFrame(ctk.CTkFrame):
 
         if not out_name.lower().endswith(f".{out_fmt}"):
             out_name += f".{out_fmt}"
+
+        if not is_safe_filename(out_name):
+            messagebox.showerror("Security Error", "Invalid output filename.\nFilenames cannot contain path separators (e.g., '/') or traverse directories.")
+            return
 
         output_path = os.path.join(out_dir, out_name)
 

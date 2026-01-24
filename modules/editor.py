@@ -7,7 +7,7 @@ import subprocess
 from utils.mkv_wrapper import get_mkv_info
 from utils.ffmpeg_wrapper import get_ffmpeg_info
 from utils.dependency_manager import DependencyManager
-from modules.widgets import TrackListFrame
+from modules.widgets import TrackListFrame, processing_state
 from utils import theme
 
 class EditorFrame(ctk.CTkFrame):
@@ -117,10 +117,11 @@ class EditorFrame(ctk.CTkFrame):
 
         output_path = os.path.join(out_dir, out_name)
 
-        if out_fmt == "mkv":
-            self._save_mkv(output_path)
-        else:
-            self._save_mp4(output_path)
+        with processing_state(self.save_btn):
+            if out_fmt == "mkv":
+                self._save_mkv(output_path)
+            else:
+                self._save_mp4(output_path)
 
     def _save_mkv(self, output_path):
         mkvmerge = DependencyManager().get_binary_path("mkvmerge")

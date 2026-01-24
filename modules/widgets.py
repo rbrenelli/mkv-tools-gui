@@ -4,6 +4,7 @@ from utils.ffmpeg_wrapper import get_ffmpeg_info
 from utils import theme
 import os
 import tkinter as tk
+import contextlib
 
 class ToolTip:
     """
@@ -470,7 +471,7 @@ class FileListFrame(ctk.CTkScrollableFrame):
         
         # Track Name Entry
         name_var = ctk.StringVar(value="")
-        name_entry = ctk.CTkEntry(row, textvariable=name_var, width=150)
+        name_entry = ctk.CTkEntry(row, textvariable=name_var, width=150, placeholder_text="Track Title")
         name_entry.pack(side="left", padx=5)
 
         # Default Checkbox
@@ -518,3 +519,18 @@ class FileListFrame(ctk.CTkScrollableFrame):
         for item in self.rows:
             item["widget"].destroy()
         self.rows = []
+
+@contextlib.contextmanager
+def processing_state(button, text="Processing..."):
+    """
+    Context manager to handle button state during long operations.
+    Updates text, disables button, and forces UI update.
+    """
+    original_text = button.cget("text")
+
+    button.configure(text=text, state="disabled")
+    button.update_idletasks()
+    try:
+        yield
+    finally:
+        button.configure(text=original_text, state="normal")

@@ -5,7 +5,7 @@ import os
 import subprocess
 from utils.mkv_wrapper import get_mkv_info, extract_tracks
 from utils.ffmpeg_wrapper import get_ffmpeg_info, extract_stream_cmd
-from modules.widgets import TrackListFrame
+from modules.widgets import TrackListFrame, processing_state
 from utils import theme
 
 class ExtractorFrame(ctk.CTkFrame):
@@ -106,25 +106,26 @@ class ExtractorFrame(ctk.CTkFrame):
                 return
             final_track_map[tid] = os.path.join(output_dir, filename)
 
-        if self.video_path.lower().endswith('.mkv'):
-            success, msg = extract_tracks(self.video_path, final_track_map)
-            if success:
-                messagebox.showinfo("Success", f"Tracks extracted to:\n{output_dir}")
+        with processing_state(self.extract_btn, text="Extracting..."):
+            if self.video_path.lower().endswith('.mkv'):
+                success, msg = extract_tracks(self.video_path, final_track_map)
+                if success:
+                    messagebox.showinfo("Success", f"Tracks extracted to:\n{output_dir}")
+                else:
+                    messagebox.showerror("Error", f"Extraction failed:\n{msg}")
             else:
-                messagebox.showerror("Error", f"Extraction failed:\n{msg}")
-        else:
-            # Non-MKV extraction using ffmpeg
-            errors = []
-            for tid, output_path in final_track_map.items():
-                cmd = extract_stream_cmd(self.video_path, tid, output_path)
-                try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-                    if result.returncode != 0:
-                        errors.append(f"Track {tid}: {result.stderr}")
-                except Exception as e:
-                    errors.append(f"Track {tid}: {str(e)}")
+                # Non-MKV extraction using ffmpeg
+                errors = []
+                for tid, output_path in final_track_map.items():
+                    cmd = extract_stream_cmd(self.video_path, tid, output_path)
+                    try:
+                        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                        if result.returncode != 0:
+                            errors.append(f"Track {tid}: {result.stderr}")
+                    except Exception as e:
+                        errors.append(f"Track {tid}: {str(e)}")
 
-            if not errors:
-                messagebox.showinfo("Success", f"Tracks extracted to:\n{output_dir}")
-            else:
-                messagebox.showerror("Error", f"Extraction failed for some tracks:\n" + "\n".join(errors))
+                if not errors:
+                    messagebox.showinfo("Success", f"Tracks extracted to:\n{output_dir}")
+                else:
+                    messagebox.showerror("Error", f"Extraction failed for some tracks:\n" + "\n".join(errors))

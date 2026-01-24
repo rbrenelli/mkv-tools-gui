@@ -9,6 +9,7 @@ from utils.ffmpeg_wrapper import get_ffmpeg_info
 from utils.dependency_manager import DependencyManager
 from modules.widgets import TrackListFrame
 from utils import theme
+from utils.validation import is_safe_filename
 
 class EditorFrame(ctk.CTkFrame):
     def __init__(self, master):
@@ -114,6 +115,10 @@ class EditorFrame(ctk.CTkFrame):
 
         if not out_name.lower().endswith(f".{out_fmt}"):
             out_name += f".{out_fmt}"
+
+        if not is_safe_filename(out_name):
+            messagebox.showerror("Security Error", "Invalid output filename.\nFilenames cannot contain path separators (e.g., '/') or traverse directories.")
+            return
 
         output_path = os.path.join(out_dir, out_name)
 

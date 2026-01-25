@@ -7,6 +7,7 @@ import subprocess
 from modules.widgets import TrackListFrame, FileListFrame
 from utils import theme
 from utils.dependency_manager import DependencyManager
+from utils.validation import is_safe_filename
 
 class CreatorFrame(ctk.CTkFrame):
     def __init__(self, master):
@@ -231,6 +232,10 @@ class CreatorFrame(ctk.CTkFrame):
 
         if not out_name or not out_dir:
             messagebox.showwarning("Warning", "Please specify output directory and filename.")
+            return
+
+        if not is_safe_filename(out_name):
+            messagebox.showerror("Security Error", "Invalid output filename.\nPlease avoid path separators (/, \\) and reserved names.")
             return
 
         # Ensure extension

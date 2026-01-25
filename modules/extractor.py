@@ -7,6 +7,7 @@ from utils.mkv_wrapper import get_mkv_info, extract_tracks
 from utils.ffmpeg_wrapper import get_ffmpeg_info, extract_stream_cmd
 from modules.widgets import TrackListFrame
 from utils import theme
+from utils.validation import is_safe_filename
 
 class ExtractorFrame(ctk.CTkFrame):
     def __init__(self, master):
@@ -94,6 +95,11 @@ class ExtractorFrame(ctk.CTkFrame):
         if not track_map_raw:
             messagebox.showwarning("Warning", "No tracks selected.")
             return
+
+        for filename in track_map_raw.values():
+            if not is_safe_filename(filename):
+                messagebox.showerror("Security Error", f"Invalid output filename found: '{filename}'.\nPlease avoid path separators (/, \\) and reserved names.")
+                return
 
         # Determine output directory
         output_dir = self.selected_out_dir if self.selected_out_dir else os.path.dirname(self.video_path)

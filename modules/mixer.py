@@ -70,9 +70,10 @@ class MixerFrame(ctk.CTkFrame):
         self.sub_controls.grid(row=0, column=0, pady=(10, 5), sticky="ew", padx=10)
         
         ctk.CTkButton(self.sub_controls, text="Add Subtitle Files", command=self.add_subs, height=35).pack(side="left", padx=(0, 10))
-        ctk.CTkButton(self.sub_controls, text="Clear List", command=self.clear_subs,
+        self.clear_btn = ctk.CTkButton(self.sub_controls, text="Clear List", command=self.clear_subs,
                       fg_color="transparent", border_width=1, hover_color=theme.COLOR_BTN_CLEAR_HOVER,
-                      text_color=theme.COLOR_BTN_CLEAR_TEXT, height=35).pack(side="left")
+                      text_color=theme.COLOR_BTN_CLEAR_TEXT, height=35, state="disabled")
+        self.clear_btn.pack(side="left")
 
         # Subtitle Title
         self.sub_title = ctk.CTkLabel(self.sub_container, text="Subtitles to Add", font=ctk.CTkFont(weight="bold"))
@@ -213,15 +214,24 @@ class MixerFrame(ctk.CTkFrame):
         self.sub_files.append(row_data)
 
     def clear_subs(self):
-        self.sub_list_frame.clear()
-        self.sub_files = []
-        self.check_ready()
+        if not self.sub_files:
+            return
+
+        if messagebox.askyesno("Confirm Clear", "Are you sure you want to clear the subtitle list?", parent=self):
+            self.sub_list_frame.clear()
+            self.sub_files = []
+            self.check_ready()
 
     def check_ready(self):
         if self.video_path and self.sub_files:
             self.process_btn.configure(state="normal")
         else:
             self.process_btn.configure(state="disabled")
+
+        if self.sub_files:
+            self.clear_btn.configure(state="normal")
+        else:
+            self.clear_btn.configure(state="disabled")
 
     def process(self):
         if not self.video_path or not self.sub_files: return

@@ -146,8 +146,8 @@ class DependencyManager:
             # Use get_binary_path to utilize cache and avoid redundant I/O
             path = self.get_binary_path(tool)
 
-            # get_binary_path returns the tool name if not found in PATH or bin_dir
-            if path == tool:
+            # get_binary_path returns None if not found
+            if path is None:
                 missing.append(tool)
 
         return missing
@@ -174,10 +174,9 @@ class DependencyManager:
             self._binary_cache[tool_name] = local_path
             return local_path
 
-        # Return None or just the tool name to let subprocess fail naturally if not found
-        # Do not cache failed lookups in case the user installs it later without restart (though unlikely)
-        # Actually, for consistency with optimization, we could cache failure too, but let's be safe.
-        return tool_name
+        # Cache the failure to avoid repeated costly filesystem scans
+        self._binary_cache[tool_name] = None
+        return None
 
     def download_dependencies(self, progress_callback=None):
         """

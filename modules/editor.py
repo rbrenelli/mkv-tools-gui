@@ -7,6 +7,7 @@ import subprocess
 from utils.mkv_wrapper import get_mkv_info
 from utils.ffmpeg_wrapper import get_ffmpeg_info
 from utils.dependency_manager import DependencyManager
+from utils.validation import is_safe_filename
 from modules.widgets import TrackListFrame
 from utils import theme
 
@@ -110,6 +111,10 @@ class EditorFrame(ctk.CTkFrame):
 
         if not out_name or not out_dir:
             messagebox.showwarning("Warning", "Please specify output directory and filename.")
+            return
+
+        if not is_safe_filename(out_name):
+            messagebox.showerror("Error", "Invalid output filename.\nPlease avoid using path separators (/ or \\).")
             return
 
         if not out_name.lower().endswith(f".{out_fmt}"):

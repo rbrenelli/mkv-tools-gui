@@ -212,6 +212,11 @@ class CreatorFrame(ctk.CTkFrame):
         self.sub_files.append(row_data)
 
     def clear_subs(self):
+        if not self.sub_files:
+            return
+        if not messagebox.askyesno("Confirm Clear", "Are you sure you want to remove all subtitle files?", parent=self):
+            return
+
         self.sub_list_frame.clear()
         self.sub_files = []
         self.check_ready()

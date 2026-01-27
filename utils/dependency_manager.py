@@ -7,6 +7,7 @@ import zipfile
 import tarfile
 import subprocess
 import stat
+import hashlib
 from pathlib import Path
 
 class DependencyManager:
@@ -59,13 +60,15 @@ class DependencyManager:
         if self.os_name == 'Windows':
             # FFmpeg & FFprobe (Essentials build contains both)
             urls['ffmpeg_pack'] = {
-                'url': 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip',
+                'url': 'https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-7.1.1-essentials_build.zip',
+                'hash': '04861d3339c5ebe38b56c19a15cf2c0cc97f5de4fa8910e4d47e5e6404e4a2d4',
                 'type': 'zip',
                 'contains': ['ffmpeg', 'ffprobe']
             }
             # MKVToolNix
             urls['mkvtoolnix_pack'] = {
                 'url': 'https://mkvtoolnix.download/windows/releases/88.0/mkvtoolnix-64-bit-88.0.7z',
+                'hash': 'a038bad65a8c22df9a1d94e5f322320579e54e238911c27d54caf458a8e58f46',
                 'type': '7z',
                 'contains': ['mkvmerge', 'mkvextract']
             }
@@ -79,6 +82,7 @@ class DependencyManager:
             if is_arm:
                 urls['ffmpeg_pack'] = {
                     'url': 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz',
+                    'hash': 'f4149bb2b0784e30e99bdda85471c9b5930d3402014e934a5098b41d0f7201b1',
                     'type': 'tar',
                     'contains': ['ffmpeg', 'ffprobe']
                 }
@@ -89,12 +93,14 @@ class DependencyManager:
             elif is_64:
                 urls['ffmpeg_pack'] = {
                     'url': 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz',
+                    'hash': 'abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67',
                     'type': 'tar',
                     'contains': ['ffmpeg', 'ffprobe']
                 }
                 # MKVToolNix - AppImage approach (Only works for x86_64)
                 urls['mkvtoolnix_pack'] = {
-                    'url': 'https://mkvtoolnix.download/appimage/MKVToolNix_GUI-x86_64.AppImage',
+                    'url': 'https://mkvtoolnix.download/appimage/MKVToolNix_GUI-88.0-x86_64.AppImage',
+                    'hash': 'bd999549b7de03e601a8d9b6a781e25dff2233f17c78512509f4ed428cd84db2',
                     'type': 'appimage',
                     'contains': ['mkvmerge', 'mkvextract']
                 }
@@ -116,19 +122,22 @@ class DependencyManager:
         elif self.os_name == 'Darwin':
             # FFmpeg
             urls['ffmpeg'] = {
-                'url': 'https://evermeet.cx/ffmpeg/getrelease/zip',
+                'url': 'https://evermeet.cx/ffmpeg/ffmpeg-6.1.1.zip',
+                'hash': '7de74c26a20dd172ed49c7de6035ee0790c83e69e461c3a6895b33ae0787e513',
                 'type': 'zip',
                 'contains': ['ffmpeg']
             }
             # FFprobe
             urls['ffprobe'] = {
-                'url': 'https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip',
+                'url': 'https://evermeet.cx/ffmpeg/ffprobe-6.1.1.zip',
+                'hash': '8644a01fd59afe1c9442a102372cacd2db73807aa05f7e33bcf06aa6e58a4771',
                 'type': 'zip',
                 'contains': ['ffprobe']
             }
             # MKVToolNix
             urls['mkvtoolnix_pack'] = {
                 'url': 'https://mkvtoolnix.download/macos/MKVToolNix-88.0.dmg',
+                'hash': 'cd34c72b47726bfbab2b7a5bd74ef5a3d4e8ce7f77b123312c9c222dfe2fe306',
                 'type': 'dmg',
                 'contains': ['mkvmerge', 'mkvextract']
             }
@@ -179,6 +188,24 @@ class DependencyManager:
         # Actually, for consistency with optimization, we could cache failure too, but let's be safe.
         return tool_name
 
+    def _verify_file_hash(self, filepath, expected_hash):
+        """
+        Verifies the SHA256 hash of the file.
+        Raises ValueError if mismatch.
+        """
+        sha256 = hashlib.sha256()
+        with open(filepath, 'rb') as f:
+            while True:
+                data = f.read(65536)
+                if not data:
+                    break
+                sha256.update(data)
+
+        calculated_hash = sha256.hexdigest()
+        if calculated_hash != expected_hash:
+            raise ValueError(f"Hash mismatch for {filepath}. Expected {expected_hash}, got {calculated_hash}")
+        return True
+
     def download_dependencies(self, progress_callback=None):
         """
         Downloads missing dependencies.
@@ -217,6 +244,7 @@ class DependencyManager:
         for pack_name in packs_to_download:
             pack_info = self.urls[pack_name]
             url = pack_info['url']
+            expected_hash = pack_info.get('hash')
 
             # Download
             filename = url.split('/')[-1]
@@ -234,8 +262,22 @@ class DependencyManager:
                     pass
 
                 urllib.request.urlretrieve(url, filepath, report)
+
+                # Verify Hash
+                if expected_hash:
+                    if progress_callback:
+                        progress_callback(current_step, total_steps, f"Verifying {filename}...")
+                    self._verify_file_hash(filepath, expected_hash)
+                    print(f"Successfully verified hash for {filename}")
+
             except Exception as e:
-                print(f"Error downloading {url}: {e}")
+                print(f"Error downloading or verifying {url}: {e}")
+                # Cleanup potential corrupt file
+                if os.path.exists(filepath):
+                    try:
+                        os.remove(filepath)
+                    except:
+                        pass
                 continue
 
             # Extract

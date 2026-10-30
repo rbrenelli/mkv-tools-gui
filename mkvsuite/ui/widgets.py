@@ -1,12 +1,14 @@
 import os
 
-from PySide6.QtCore import QSettings, Qt, Signal
+from PySide6.QtCore import QSettings, QSize, Qt, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QCompleter, QFileDialog, QHBoxLayout, QLabel, QPlainTextEdit, QProgressBar,
-    QPushButton, QStyledItemDelegate, QVBoxLayout, QWidget,
+    QScrollArea, QCheckBox, QComboBox, QCompleter, QFileDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit,
+    QProgressBar, QPushButton, QStyledItemDelegate, QVBoxLayout, QWidget,
 )
 
-from .runner import Job, JobRunner
+from ..core.plan import ToolMissing
+from .runner import JobRunner
 
 
 def settings():
@@ -39,10 +41,64 @@ def open_dir(parent, title):
     return d
 
 
-VIDEO_FILTER = "Matroska video (*.mkv *.mka *.mks *.webm);;All files (*)"
-SUB_FILTER = "Subtitles (*.srt *.ass *.ssa *.sup *.vtt *.idx *.sub);;All files (*)"
+def show_problem(parent, title, error):
+    """Friendly dialog for ToolMissing / unsupported combinations / other errors."""
+    QMessageBox.warning(parent, title, str(error))
+
+
+VIDEO_FILTER = "Video files (*.mkv *.mp4 *.m4v *.mov *.avi *.webm *.mka);;All files (*)"
+SUB_FILTER = "Subtitles (*.srt *.ass *.ssa *.vtt *.sup *.idx *.sub);;All files (*)"
 SUB_EXTS = {".srt", ".ass", ".ssa", ".sup", ".vtt", ".idx", ".sub"}
-VIDEO_EXTS = {".mkv", ".mka", ".mks", ".webm", ".mp4", ".m4v", ".avi", ".mov"}
+VIDEO_EXTS = {".mkv", ".mka", ".webm", ".mp4", ".m4v", ".mov", ".avi"}
+ROW_HEIGHT = 40
+
+
+def card(layout, margins=(18, 16, 18, 16), spacing=10):
+    """A rounded, bordered container holding `layout`. Returns the QFrame."""
+    f = QFrame()
+    f.setObjectName("card")
+    layout.setContentsMargins(*margins)
+    layout.setSpacing(spacing)
+    f.setLayout(layout)
+    return f
+
+
+def scroll_body():
+    """A scrolling content area. Returns (scroll_area, layout_to_fill). Keep action bars outside it."""
+    body = QWidget()
+    lay = QVBoxLayout(body)
+    lay.setContentsMargins(0, 0, 10, 0)
+    lay.setSpacing(12)
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setFrameShape(QFrame.NoFrame)
+    area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    area.setWidget(body)
+    return area, lay
+
+
+def page_header(layout, title, description):
+    t = QLabel(title)
+    t.setObjectName("pageTitle")
+    layout.addWidget(t)
+    d = QLabel(description)
+    d.setObjectName("muted")
+    d.setWordWrap(True)
+    layout.addWidget(d)
+    layout.addSpacing(6)
+
+
+def muted(text):
+    l = QLabel(text)
+    l.setObjectName("muted")
+    l.setWordWrap(True)
+    return l
+
+
+def section(text):
+    l = QLabel(text)
+    l.setObjectName("sectionTitle")
+    return l
 
 
 class LanguageCombo(QComboBox):
@@ -53,17 +109,16 @@ class LanguageCombo(QComboBox):
         super().__init__(parent)
         self.setEditable(True)
         self.setInsertPolicy(QComboBox.NoInsert)
-        self._known = {}
         for l in languages:
             self.addItem(l.label, l.code)
-            self._known[l.code] = l.label
         comp = QCompleter(self.model(), self)
         comp.setFilterMode(Qt.MatchContains)
         comp.setCaseSensitivity(Qt.CaseInsensitive)
         self.setCompleter(comp)
         self.set_code(code)
         self.currentIndexChanged.connect(lambda _i: self.changed.emit())
-        self.setMinimumWidth(170)
+        self.setMinimumWidth(190)
+        self.lineEdit().setPlaceholderText("Search language…")
 
     def set_code(self, code):
         i = self.findData(code)
@@ -80,27 +135,76 @@ class LanguageCombo(QComboBox):
         e.ignore()
 
 
-class OnlyColumnDelegate(QStyledItemDelegate):
-    """Allows in-place editing for a single column of a tree/table."""
-    def __init__(self, column, parent=None):
+class RowDelegate(QStyledItemDelegate):
+    """Comfortable row height, and (optionally) editing limited to one column."""
+    def __init__(self, parent=None, edit_column=None, height=ROW_HEIGHT - 6):
         super().__init__(parent)
-        self._col = column
+        self._col, self._h = edit_column, height
+
+    def sizeHint(self, option, index):
+        s = super().sizeHint(option, index)
+        return QSize(s.width(), max(s.height(), self._h))
 
     def createEditor(self, parent, option, index):
-        return super().createEditor(parent, option, index) if index.column() == self._col else None
+        if self._col is not None and index.column() != self._col:
+            return None
+        return super().createEditor(parent, option, index)
 
 
 def centered(widget):
     w = QWidget()
     lay = QHBoxLayout(w)
-    lay.setContentsMargins(0, 0, 0, 0)
+    lay.setContentsMargins(4, 0, 4, 0)
     lay.setAlignment(Qt.AlignCenter)
     lay.addWidget(widget)
     return w
 
 
+def padded(widget, h=6, v=4):
+    """Keeps an input from touching the cell borders."""
+    w = QWidget()
+    lay = QHBoxLayout(w)
+    lay.setContentsMargins(h, v, h, v)
+    lay.addWidget(widget)
+    return w
+
+
+def unwrap(cell, cls):
+    """Get the real widget back out of centered()/padded()."""
+    return cell.findChild(cls)
+
+
+class DropZone(QFrame):
+    """The empty state: a big, friendly target with the main actions."""
+    def __init__(self, title, hint, buttons, parent=None):
+        super().__init__(parent)
+        self.setObjectName("dropzone")
+        lay = QVBoxLayout(self)
+        lay.setAlignment(Qt.AlignCenter)
+        lay.setSpacing(12)
+        t = QLabel(title)
+        t.setObjectName("sectionTitle")
+        t.setAlignment(Qt.AlignCenter)
+        t.setStyleSheet("font-size: 16pt;")
+        lay.addWidget(t)
+        h = muted(hint)
+        h.setWordWrap(False)
+        h.setAlignment(Qt.AlignCenter)
+        lay.addWidget(h)
+        row = QHBoxLayout()
+        row.setAlignment(Qt.AlignCenter)
+        for text, cb, primary in buttons:
+            b = QPushButton(text)
+            if primary:
+                b.setObjectName("primary")
+            b.clicked.connect(cb)
+            row.addWidget(b)
+        lay.addSpacing(6)
+        lay.addLayout(row)
+
+
 class JobPanel(QWidget):
-    """Progress bar, status line, cancel button and a log, for running a queue of jobs one by one."""
+    """Status line, thin progress bar, cancel, and an optional log, for running a queue of jobs one by one."""
     busy_changed = Signal(bool)
     all_done = Signal(int, int)   # succeeded, failed
 
@@ -108,15 +212,19 @@ class JobPanel(QWidget):
         super().__init__(parent)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        row = QHBoxLayout()
-        self.status = QLabel("")
+        lay.setSpacing(8)
+        self.status = QLabel("Ready.")
+        self.status.setObjectName("muted")
         self.status.setWordWrap(True)
+        row = QHBoxLayout()
         self.bar = QProgressBar()
         self.bar.setRange(0, 1000)
         self.bar.setTextVisible(False)
         self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setObjectName("rowbtn")
         self.cancel_btn.clicked.connect(self.cancel)
         self.details_btn = QPushButton("Details")
+        self.details_btn.setObjectName("rowbtn")
         self.details_btn.setCheckable(True)
         row.addWidget(self.bar, 1)
         row.addWidget(self.cancel_btn)
@@ -126,7 +234,8 @@ class JobPanel(QWidget):
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(2000)
-        self.log.setMinimumHeight(110)
+        self.log.setMinimumHeight(120)
+        self.log.setMaximumHeight(220)
         self.log.hide()
         self.details_btn.toggled.connect(self.log.setVisible)
         lay.addWidget(self.log)
@@ -137,11 +246,7 @@ class JobPanel(QWidget):
         self._runner.finished.connect(self._on_finished)
         self._jobs, self._index, self._ok, self._failed = [], 0, 0, 0
         self.busy = False
-        self._set_idle()
-
-    def _set_idle(self):
         self.cancel_btn.setEnabled(False)
-        self.bar.setValue(0)
 
     def run(self, jobs):
         if self.busy or not jobs:
@@ -149,6 +254,7 @@ class JobPanel(QWidget):
         self._jobs, self._index, self._ok, self._failed = list(jobs), 0, 0, 0
         self.log.clear()
         self.busy = True
+        self.bar.setValue(0)
         self.cancel_btn.setEnabled(True)
         self.busy_changed.emit(True)
         self._start_current()
@@ -160,9 +266,9 @@ class JobPanel(QWidget):
     def _start_current(self):
         job = self._jobs[self._index]
         n = len(self._jobs)
-        self.status.setText(f"{job.title}" + (f"  ({self._index + 1} of {n})" if n > 1 else ""))
+        self.status.setText(f"{job.title}" + (f"   ({self._index + 1} of {n})" if n > 1 else ""))
         self.log.appendPlainText(f"$ {' '.join(job.argv)}")
-        self._runner.start(job.argv)
+        self._runner.start(job.argv, job.kind, job.duration_ns)
 
     def _on_progress(self, pct):
         n = max(len(self._jobs), 1)
@@ -181,7 +287,7 @@ class JobPanel(QWidget):
                     os.remove(p)
                 except OSError:
                     pass
-            self.log.appendPlainText(("Cancelled." if cancelled else "Error: " + outcome.error))
+            self.log.appendPlainText("Cancelled." if cancelled else "Error: " + outcome.error)
             if not cancelled:
                 self.details_btn.setChecked(True)
         self._index += 1
@@ -189,7 +295,7 @@ class JobPanel(QWidget):
             self._start_current()
             return
         self.busy = False
-        self._set_idle()
+        self.cancel_btn.setEnabled(False)
         if self._failed == 0:
             self.bar.setValue(1000)
             self.status.setText("Done." if self._ok == 1 else f"Done — {self._ok} files.")

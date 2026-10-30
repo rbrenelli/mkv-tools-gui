@@ -4,6 +4,8 @@ import shutil
 
 REQUIRED_TOOLS = ("mkvmerge", "mkvextract", "mkvpropedit")
 INSTALL_HINT = "sudo apt install mkvtoolnix"
+FFMPEG_TOOLS = ("ffmpeg", "ffprobe")   # only needed for MP4/AVI/MOV
+FFMPEG_HINT = "sudo apt install ffmpeg"
 
 
 def find_tool(name):
@@ -12,6 +14,10 @@ def find_tool(name):
 
 def missing_tools():
     return [t for t in REQUIRED_TOOLS if not find_tool(t)]
+
+
+def missing_ffmpeg():
+    return [t for t in FFMPEG_TOOLS if not find_tool(t)]
 
 
 def clean_env(env=None):

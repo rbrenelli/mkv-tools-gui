@@ -12,11 +12,25 @@ EXTENSIONS = {
     "V_AV1": ".obu", "V_MPEG2": ".mpg",
 }
 
+# ffprobe codec names (codec_id is stored as "ffmpeg:<name>" for non-MKV files)
+FFMPEG_EXTENSIONS = {
+    "subrip": ".srt", "srt": ".srt", "mov_text": ".srt", "text": ".srt", "ass": ".ass", "ssa": ".ass",
+    "webvtt": ".vtt", "hdmv_pgs_subtitle": ".sup", "dvd_subtitle": ".mks",
+    "aac": ".aac", "ac3": ".ac3", "eac3": ".eac3", "dts": ".dts", "flac": ".flac", "opus": ".opus",
+    "vorbis": ".ogg", "mp3": ".mp3", "mp2": ".mp2", "truehd": ".thd",
+    "h264": ".h264", "hevc": ".h265", "vp9": ".ivf", "vp8": ".ivf", "av1": ".obu", "mpeg2video": ".m2v",
+}
+
 _BAD = re.compile(r"[^\w .\-\[\]()]", re.UNICODE)
 
 
 def extension_for(codec_id):
     cid = codec_id or ""
+    if cid.startswith("ffmpeg:"):
+        name = cid[7:]
+        if name.startswith("pcm_"):
+            return ".wav"
+        return FFMPEG_EXTENSIONS.get(name, ".mkv" if name else ".bin")
     if cid in EXTENSIONS:
         return EXTENSIONS[cid]
     if cid.startswith("A_AAC"):

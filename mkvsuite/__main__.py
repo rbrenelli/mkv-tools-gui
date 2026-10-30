@@ -1,5 +1,18 @@
 import argparse
+import os
 import sys
+
+# Messages from Qt/Wayland that are harmless on ChromeOS (Crostini) and only clutter the terminal
+_NOISE = ("wl_surface.enter", "Failed to register with host portal", "propagateSizeHints")
+
+
+def prepare_environment():
+    """Fixes for running under ChromeOS Crostini (Sommelier)."""
+    # Crostini sets XCURSOR_SIZE for the dense display and Qt then scales it again, so the pointer comes out
+    # about twice too big. XCURSOR_SIZE_LOW_DENSITY is the unscaled size.
+    low = os.environ.get("XCURSOR_SIZE_LOW_DENSITY")
+    if low and os.environ.get("WAYLAND_DISPLAY") and not os.environ.get("MKVSUITE_KEEP_CURSOR_SIZE"):
+        os.environ["XCURSOR_SIZE"] = low
 
 
 def main(argv=None):
@@ -27,7 +40,14 @@ def main(argv=None):
         print("Launcher installed:", launcher.install(exe, ICON_PATH))
         return 0
 
+    prepare_environment()
+    from PySide6.QtCore import qInstallMessageHandler
     from PySide6.QtWidgets import QApplication
+
+    def handler(_mode, _ctx, msg):
+        if not any(n in msg for n in _NOISE):
+            print(msg, file=sys.stderr)
+    qInstallMessageHandler(handler)
     app = QApplication([sys.argv[0]] + qt_args)
     app.setApplicationName("mkv-tool-suite")
     app.setOrganizationName("rbrenelli")

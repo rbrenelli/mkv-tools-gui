@@ -45,6 +45,7 @@ class MediaInfo:
     container: str
     duration_ns: int = 0
     tracks: list = field(default_factory=list)
+    backend: str = "mkvtoolnix"   # "ffmpeg" for MP4/AVI/MOV: track ids are ffprobe stream indexes
 
     def of_type(self, type_):
         return [t for t in self.tracks if t.type == type_]

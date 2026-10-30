@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QThread, Signal
 
 from ..core import jobs
-from ..core.model import MkvError, read_info
+from ..core.media import read_media
+from ..core.model import MkvError
 from ..core.tools import clean_env
 
 
@@ -14,6 +15,8 @@ class Job:
     title: str
     argv: list
     outputs: list = field(default_factory=list)  # partial files to remove if the job fails or is cancelled
+    kind: str = "mkvtoolnix"                      # or "ffmpeg": decides how progress/exit codes are read
+    duration_ns: int = 0
 
 
 class JobRunner(QObject):
@@ -28,9 +31,11 @@ class JobRunner(QObject):
         self._buf = ""
         self._text = []
         self._cancelled = False
+        self._kind, self._duration = "mkvtoolnix", 0
 
-    def start(self, argv):
+    def start(self, argv, kind="mkvtoolnix", duration_ns=0):
         self._buf, self._text, self._cancelled = "", [], False
+        self._kind, self._duration = kind, duration_ns
         self._proc = QProcess(self)
         env = QProcessEnvironment()
         for k, v in clean_env().items():
@@ -55,6 +60,8 @@ class JobRunner(QObject):
 
     def _handle(self, ln):
         pct = jobs.progress_from_line(ln)
+        if pct is None and self._kind == "ffmpeg":
+            pct = jobs.ffmpeg_progress(ln, self._duration)
         if pct is not None:
             self.progress.emit(pct)
         elif ln.strip() and not jobs.is_noise(ln):
@@ -72,7 +79,8 @@ class JobRunner(QObject):
         if self._cancelled:
             self.finished.emit(jobs.Outcome(False, error="Cancelled"), True)
         else:
-            self.finished.emit(jobs.interpret(code, "\n".join(self._text)), False)
+            interpret = jobs.interpret_ffmpeg if self._kind == "ffmpeg" else jobs.interpret
+            self.finished.emit(interpret(code, "\n".join(self._text)), False)
 
 
 class InfoLoader(QThread):
@@ -87,6 +95,6 @@ class InfoLoader(QThread):
     def run(self):
         for p in self._paths:
             try:
-                self.loaded.emit(p, read_info(p))
+                self.loaded.emit(p, read_media(p))
             except MkvError as e:
                 self.failed.emit(p, str(e))

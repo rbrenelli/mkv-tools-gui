@@ -1,19 +1,19 @@
 import os
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QTableWidget,
-    QTableWidgetItem, QVBoxLayout, QWidget,
+    QCheckBox, QFileDialog, QHBoxLayout, QHeaderView, QLineEdit, QMessageBox, QPushButton, QTableWidgetItem,
+    QVBoxLayout, QWidget,
 )
 
-from ..core import commands, naming
-from ..core.model import MkvError, read_info
-from ..core.paths import safe_output_path
-from ..core.tools import find_tool
+from ..core import commands, ffmpeg, naming, plan
+from ..core.media import read_media
+from ..core.model import MkvError
 from .runner import Job
-from .widgets import (VIDEO_EXTS, VIDEO_FILTER, JobPanel, LanguageCombo, centered, open_dir, open_files)
+from .subs_page import make_table
+from .widgets import (ROW_HEIGHT, VIDEO_EXTS, VIDEO_FILTER, JobPanel, LanguageCombo, card, centered, muted, open_files,
+                      padded, page_header, remember_dir, scroll_body, show_problem, unwrap)
 
-C_KEEP, C_TRACK, C_CODEC, C_LANG, C_NAME, C_DEFAULT, C_FORCED, C_ENABLED = range(8)
+C_KEEP, C_TRACK, C_LANG, C_NAME, C_DEFAULT, C_FORCED, C_ENABLED = range(7)
 
 
 class EditPage(QWidget):
@@ -23,44 +23,43 @@ class EditPage(QWidget):
         super().__init__()
         self.languages = languages
         self.info = None
+        self._inplace = False
         self.setAcceptDrops(True)
 
-        lay = QVBoxLayout(self)
-        head = QLabel("Edit Tracks")
-        head.setObjectName("pageTitle")
-        lay.addWidget(head)
-        hint = QLabel("Change language, name and flags. “Apply in place” edits the file directly and takes a "
-                      "moment, even for huge files. Removing tracks needs “Save as new file…”.")
-        hint.setWordWrap(True)
-        lay.addWidget(hint)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(12)
+        area, lay = scroll_body()
+        root.addWidget(area, 1)
+        page_header(lay, "Edit Tracks",
+                    "Change language, name and flags. “Apply in place” (MKV only) edits the file directly and takes "
+                    "seconds, even for huge files. Removing tracks, or MP4 files, need “Save as new file…”.")
 
+        box = QVBoxLayout()
         row = QHBoxLayout()
-        row.addWidget(QLabel("File:"))
         self.file_edit = QLineEdit()
         self.file_edit.setReadOnly(True)
-        self.file_edit.setPlaceholderText("Choose or drop a file…")
-        b = QPushButton("Choose…")
+        self.file_edit.setPlaceholderText("Choose a video, or drop one on this window…")
+        b = QPushButton("Choose video…")
         b.clicked.connect(self.choose)
         row.addWidget(self.file_edit, 1)
         row.addWidget(b)
-        lay.addLayout(row)
-
-        self.table = QTableWidget(0, 8)
-        self.table.setHorizontalHeaderLabels(["Keep", "Track", "Codec", "Language", "Name", "Default", "Forced", "Enabled"])
-        self.table.verticalHeader().hide()
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionMode(QTableWidget.NoSelection)
-        self.table.setAlternatingRowColors(True)
+        box.addLayout(row)
+        self.table = make_table(["Keep", "Track", "Language", "Name", "Default", "Forced", "Enabled"])
+        self.table.setMinimumHeight(240)
         h = self.table.horizontalHeader()
-        for c in (C_KEEP, C_TRACK, C_CODEC, C_DEFAULT, C_FORCED, C_ENABLED):
-            h.setSectionResizeMode(c, QHeaderView.ResizeToContents)
-        h.setSectionResizeMode(C_LANG, QHeaderView.Interactive)
-        self.table.setColumnWidth(C_LANG, 200)
+        h.setSectionResizeMode(QHeaderView.Interactive)
+        for c, w in ((C_KEEP, 64), (C_TRACK, 240), (C_LANG, 210), (C_DEFAULT, 84), (C_FORCED, 78), (C_ENABLED, 86)):
+            self.table.setColumnWidth(c, w)
         h.setSectionResizeMode(C_NAME, QHeaderView.Stretch)
-        lay.addWidget(self.table, 1)
+        box.addWidget(self.table, 1)
+        self.note = muted("")
+        box.addWidget(self.note)
+        lay.addWidget(card(box), 1)
 
+        fbox = QVBoxLayout()
         self.panel = JobPanel()
-        lay.addWidget(self.panel)
+        fbox.addWidget(self.panel)
         r = QHBoxLayout()
         r.addStretch(1)
         self.copy_btn = QPushButton("Save as new file…")
@@ -70,29 +69,35 @@ class EditPage(QWidget):
         self.inplace_btn.clicked.connect(self.apply_in_place)
         r.addWidget(self.copy_btn)
         r.addWidget(self.inplace_btn)
-        lay.addLayout(r)
-        self._set_enabled(False)
-        self.panel.busy_changed.connect(lambda busy: self._set_enabled(not busy and self.info is not None))
+        fbox.addLayout(r)
+        root.addWidget(card(fbox))
+        self.panel.busy_changed.connect(lambda _b: self._refresh())
         self.panel.all_done.connect(self._after_job)
+        self._refresh()
 
-    def _set_enabled(self, on):
+    def _refresh(self):
+        on = self.info is not None and not self.panel.busy
         self.copy_btn.setEnabled(on)
-        self.inplace_btn.setEnabled(on)
+        self.inplace_btn.setEnabled(on and self.info.backend == "mkvtoolnix")
 
     # ---- loading
     def choose(self):
-        p = open_files(self, "Select a file", VIDEO_FILTER, multiple=False)
+        p = open_files(self, "Select a video", VIDEO_FILTER, multiple=False)
         if p:
             self.load(p)
 
     def load(self, path):
         try:
-            info = read_info(path)
+            info = read_media(path)
         except MkvError as e:
-            QMessageBox.warning(self, "Could not read file", f"{os.path.basename(path)}\n\n{e}")
+            show_problem(self, "Could not read file", f"{os.path.basename(path)}\n\n{e}")
             return
         self.info = info
         self.file_edit.setText(path)
+        mkv = info.backend == "mkvtoolnix"
+        self.note.setText("" if mkv else "This is not an MKV file: changes are saved to a new file, and the "
+                                          "“Enabled” flag isn't available.")
+        self.note.setVisible(not mkv)
         self.table.setRowCount(0)
         for t in info.tracks:
             r = self.table.rowCount()
@@ -100,21 +105,23 @@ class EditPage(QWidget):
             keep = QCheckBox()
             keep.setChecked(True)
             self.table.setCellWidget(r, C_KEEP, centered(keep))
-            self.table.setItem(r, C_TRACK, QTableWidgetItem(t.short))
-            self.table.setItem(r, C_CODEC, QTableWidgetItem(t.codec))
-            self.table.setCellWidget(r, C_LANG, LanguageCombo(self.languages, t.language))
-            self.table.setCellWidget(r, C_NAME, QLineEdit(t.name))
+            item = QTableWidgetItem(f"{t.short}  ·  {t.codec}")
+            item.setToolTip(f"{t.short}  ·  {t.codec}")
+            self.table.setItem(r, C_TRACK, item)
+            self.table.setCellWidget(r, C_LANG, padded(LanguageCombo(self.languages, t.language)))
+            self.table.setCellWidget(r, C_NAME, padded(QLineEdit(t.name)))
             for col, val in ((C_DEFAULT, t.default), (C_FORCED, t.forced), (C_ENABLED, t.enabled)):
                 cb = QCheckBox()
                 cb.setChecked(val)
+                cb.setEnabled(mkv or col != C_ENABLED)
                 self.table.setCellWidget(r, col, centered(cb))
-            self.table.cellWidget(r, C_DEFAULT).findChild(QCheckBox).toggled.connect(
+            unwrap(self.table.cellWidget(r, C_DEFAULT), QCheckBox).toggled.connect(
                 lambda on, row=r: self._exclusive_default(row, on))
-            self.table.setRowHeight(r, 36)
-        self._set_enabled(not self.panel.busy)
+            self.table.setRowHeight(r, ROW_HEIGHT + 10)
+        self._refresh()
 
     def _box(self, r, col):
-        return self.table.cellWidget(r, col).findChild(QCheckBox)
+        return unwrap(self.table.cellWidget(r, col), QCheckBox)
 
     def _exclusive_default(self, row, on):
         if not on:
@@ -129,8 +136,8 @@ class EditPage(QWidget):
         edits = {}
         for r, t in enumerate(self.info.tracks):
             e = commands.TrackEdit()
-            lang = self.table.cellWidget(r, C_LANG).code()
-            name = self.table.cellWidget(r, C_NAME).text().strip()
+            lang = unwrap(self.table.cellWidget(r, C_LANG), LanguageCombo).code()
+            name = unwrap(self.table.cellWidget(r, C_NAME), QLineEdit).text().strip()
             if lang != t.language:
                 e.language = lang
             if name != t.name:
@@ -149,8 +156,7 @@ class EditPage(QWidget):
 
     # ---- actions
     def apply_in_place(self):
-        exe = find_tool("mkvpropedit")
-        if not (exe and self.info):
+        if not self.info:
             return
         if len(self._keep_ids()) != len(self.info.tracks):
             QMessageBox.information(self, "Removing tracks",
@@ -162,34 +168,43 @@ class EditPage(QWidget):
             return
         if QMessageBox.question(self, "Edit the original file?",
                                 f"This changes {os.path.basename(self.info.path)} directly.\n"
-                                "The video and audio are not touched, but the file itself is modified. Continue?") != QMessageBox.Yes:
+                                "Video and audio are not touched, but the file itself is modified. Continue?") != QMessageBox.Yes:
             return
-        cmd = commands.build_propedit(exe, self.info.path, self.info, edits)
-        self.panel.run([Job(f"Updating {os.path.basename(self.info.path)}", cmd)])
+        try:
+            p = plan.propedit(self.info, edits)
+        except (plan.ToolMissing, ffmpeg.UnsupportedError) as e:
+            show_problem(self, "Can't do that", e)
+            return
+        self._inplace = True
+        self.panel.run([Job(f"Updating {os.path.basename(self.info.path)}", p.argv)])
 
     def save_copy(self):
-        exe = find_tool("mkvmerge")
-        if not (exe and self.info):
+        if not self.info:
             return
-        from PySide6.QtWidgets import QFileDialog
-        from .widgets import last_dir, remember_dir
         stem = naming.stem_of(self.info.path)
-        suggested = os.path.join(os.path.dirname(self.info.path), f"{stem}_edited.mkv")
-        path, _ = QFileDialog.getSaveFileName(self, "Save as", suggested, "Matroska (*.mkv)")
+        mp4_in = os.path.splitext(self.info.path)[1].lower() in ffmpeg.MP4_EXTS
+        suggested = os.path.join(os.path.dirname(self.info.path), f"{stem}_edited{'.mp4' if mp4_in else '.mkv'}")
+        filters = "MP4 (*.mp4);;Matroska (*.mkv)" if mp4_in else "Matroska (*.mkv);;MP4 (*.mp4)"
+        path, chosen = QFileDialog.getSaveFileName(self, "Save as", suggested, filters)
         if not path:
             return
-        if not path.lower().endswith(".mkv"):
-            path += ".mkv"
+        if os.path.splitext(path)[1].lower() not in (".mkv", ".mp4"):
+            path += ".mp4" if "mp4" in chosen.lower() else ".mkv"
         if os.path.abspath(path) == os.path.abspath(self.info.path):
             QMessageBox.warning(self, "File name", "Choose a different name, or use “Apply in place”.")
             return
         remember_dir(path)
-        cmd = commands.build_mux(exe, path, self.info, keep_ids=self._keep_ids(), edits=self._edits())
-        self.panel.run([Job(f"Writing {os.path.basename(path)}", cmd, [path])])
+        try:
+            p = plan.mux(self.info, path, keep_ids=self._keep_ids(), edits=self._edits())
+        except (plan.ToolMissing, ffmpeg.UnsupportedError) as e:
+            show_problem(self, "Can't do that", e)
+            return
+        self.panel.run([Job(f"Writing {os.path.basename(path)}", p.argv, [path], p.kind, p.duration_ns)])
 
     def _after_job(self, ok, failed):
-        if ok and not failed and self.info and self.panel.status.text().startswith("Done"):
-            self.load(self.info.path)   # show what is really in the file now (in-place case)
+        if self._inplace and ok and not failed and self.info:
+            self.load(self.info.path)   # show what is really in the file now
+        self._inplace = False
 
     # ---- drag and drop
     def dragEnterEvent(self, e):

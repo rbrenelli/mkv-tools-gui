@@ -8,13 +8,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
     from PySide6.QtCore import QEventLoop, QTimer
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication, QLineEdit, QMessageBox
     HAVE_QT = True
 except ImportError:
     HAVE_QT = False
 
-from mkvsuite.core.model import read_info
-from mkvsuite.core.tools import missing_tools
+from mkvsuite.core.media import read_media as read_info
+from mkvsuite.core.tools import missing_ffmpeg, missing_tools
 
 
 def wait_for(signal, timeout_ms=20000):
@@ -32,6 +32,8 @@ class UiSmoke(unittest.TestCase):
         QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.Yes)   # auto-confirm dialogs
         QMessageBox.warning = staticmethod(lambda *a, **k: cls.fail_dialog(*a))
         from mkvsuite.ui.main_window import MainWindow
+        from mkvsuite.ui.widgets import LanguageCombo, unwrap
+        globals()["LanguageCombo"], globals()["unwrap"] = LanguageCombo, unwrap
         cls.win = MainWindow()
 
     @staticmethod
@@ -67,7 +69,7 @@ class UiSmoke(unittest.TestCase):
             ad = self.win.pages[1]
             ad.load_video(base)
             ad.add_subs([pt])
-            self.assertEqual(ad.subs.cellWidget(0, 1).code(), "por")
+            self.assertEqual(unwrap(ad.subs.cellWidget(0, 1), LanguageCombo).code(), "por")
             ad.save()
             wait_for(ad.panel.all_done)
             new = os.path.join(d, "Show.S01E01_subs.mkv")
@@ -77,13 +79,47 @@ class UiSmoke(unittest.TestCase):
             # --- Edit in place: Czech (not in the old app's list) + name
             ed = self.win.pages[2]
             ed.load(new)
-            ed.table.cellWidget(1, 3).set_code("cze")
-            ed.table.cellWidget(1, 4).setText("Cesky")
+            unwrap(ed.table.cellWidget(1, 2), LanguageCombo).set_code("cze")
+            unwrap(ed.table.cellWidget(1, 3), QLineEdit).setText("Cesky")
             ed.apply_in_place()
             wait_for(ed.panel.all_done)
             info = read_info(new)
             self.assertEqual((info.tracks[1].language, info.tracks[1].name), ("cze", "Cesky"))
             self.assertTrue(info.tracks[0].forced)
+
+    @unittest.skipIf(missing_ffmpeg(), "ffmpeg not installed")
+    def test_mp4_through_the_ui(self):
+        with tempfile.TemporaryDirectory() as d:
+            en, pt = os.path.join(d, "en.srt"), os.path.join(d, "pt.srt")
+            for p, text in ((en, "Hello"), (pt, "Ol\u00e1")):
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(f"1\n00:00:00,000 --> 00:00:01,000\n{text}\n")
+            mp4 = os.path.join(d, "Clip.mp4")
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=d=2:s=160x120", "-i", en,
+                            "-map", "0", "-map", "1", "-c:v", "libx264", "-c:s", "mov_text",
+                            "-metadata:s:s:0", "language=eng", mp4], check=True)
+
+            ex = self.win.pages[0]
+            ex.clear()
+            ex.add_paths([mp4])
+            while ex._loaders:
+                self.app.processEvents()
+            self.assertEqual(ex.tree.topLevelItemCount(), 1)
+            ex.extract()
+            wait_for(ex.panel.all_done)
+            out = os.path.join(d, "Clip.eng.srt")      # mov_text came out as a real .srt
+            with open(out, encoding="utf-8") as f:
+                self.assertIn("Hello", f.read())
+
+            ad = self.win.pages[1]
+            ad.subs.setRowCount(0)          # the page is shared with the previous test
+            ad.load_video(mp4)
+            self.assertEqual(ad.fmt.currentData(), ".mp4")   # follows the input
+            ad.add_subs([pt])
+            ad.save()
+            wait_for(ad.panel.all_done)
+            info = read_info(os.path.join(d, "Clip_subs.mp4"))
+            self.assertEqual([t.language for t in info.of_type("subtitles")], ["eng", "por"])
 
 
 if __name__ == "__main__":

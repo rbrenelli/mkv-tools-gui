@@ -85,8 +85,9 @@ def detect_language(filename, languages):
             table[l.iso1] = l.code
         table[l.name.lower()] = l.code
     table.update(ALIASES)
-    if len(parts) < 2:
-        return None
+    if len(parts) == 1:   # a bare 'pt.srt' / 'eng.srt' is a language; a bare title like 'It.srt' is too risky
+        l = parts[0].lower()
+        return table.get(l) if len(l) in (2, 3) and l in table and l != "und" else None
     # 'pt-BR' splits into ['pt', 'BR']; the alias 'br' maps to Portuguese, so check from the end
     for part in reversed(parts[1:][-3:]):
         code = table.get(part.lower())

@@ -28,6 +28,10 @@ class Track:
     text_subtitles: bool = False
 
     @property
+    def short(self):
+        return f"{self.type.capitalize()} #{self.id}"
+
+    @property
     def label(self):
         bits = [self.type.capitalize(), f"#{self.id}", self.codec]
         if self.language and self.language != "und":

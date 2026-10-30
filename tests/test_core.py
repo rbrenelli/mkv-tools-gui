@@ -80,7 +80,10 @@ class LanguageTests(unittest.TestCase):
         self.assertEqual(d("Movie_English.srt"), "eng")
         self.assertEqual(d("Movie.en.srt"), "eng")
         self.assertEqual(d("Movie.cs.srt"), "cze")
-        self.assertIsNone(d("It.srt"))          # a lone name is the title, not a language
+        self.assertEqual(d("pt.srt"), "por")    # translations are often just named by language
+        self.assertEqual(d("eng.srt"), "eng")
+        self.assertIsNone(d("Italian.srt"))     # a lone long word is more likely a title
+        self.assertIsNone(d("It.Follows.srt"))  # 'It' is the title, not Italian
         self.assertIsNone(d("Movie.2020.srt"))
 
     def test_czech_survives(self):
@@ -169,8 +172,9 @@ class IntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             en = os.path.join(d, "en.srt")
             pt = os.path.join(d, "pt.srt")
-            open(en, "w").write("1\n00:00:00,000 --> 00:00:01,000\nHello\n")
-            open(pt, "w").write("1\n00:00:00,000 --> 00:00:01,000\nOlá\n")
+            for path, text in ((en, "Hello"), (pt, "Olá")):
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(f"1\n00:00:00,000 --> 00:00:01,000\n{text}\n")
             base = os.path.join(d, "base.mkv")
             subprocess.run(["mkvmerge", "-o", base, "--language", "0:eng", "--forced-display-flag", "0:1", en],
                            capture_output=True, check=True)

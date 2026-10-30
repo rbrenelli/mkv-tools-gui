@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MKV Tool Suite
+Comment=Extract, add and edit tracks in MKV files
+Exec=mkv-tool-suite %f
+Icon=mkv-tool-suite
+Categories=AudioVideo;Video;
+MimeType=video/x-matroska;
+Terminal=false
+StartupWMClass=mkv-tool-suite

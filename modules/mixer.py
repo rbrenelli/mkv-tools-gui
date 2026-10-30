@@ -8,6 +8,7 @@ import subprocess
 from tkinter import PanedWindow
 from modules.widgets import TrackListFrame, FileListFrame
 from utils import theme
+from utils.security import safe_output_path
 from utils.dependency_manager import DependencyManager
 
 class MixerFrame(ctk.CTkFrame):
@@ -237,7 +238,10 @@ class MixerFrame(ctk.CTkFrame):
         if not out_name.lower().endswith(f".{out_fmt}"):
             out_name += f".{out_fmt}"
 
-        output_path = os.path.join(out_dir, out_name)
+        output_path = safe_output_path(out_dir, out_name)
+        if not output_path:
+            messagebox.showwarning("Warning", "Invalid output filename.")
+            return
 
         if out_fmt == "mkv":
             self._process_mkv(output_path)

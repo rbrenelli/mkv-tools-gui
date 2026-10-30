@@ -9,6 +9,7 @@ from utils.ffmpeg_wrapper import get_ffmpeg_info
 from utils.dependency_manager import DependencyManager
 from modules.widgets import TrackListFrame
 from utils import theme
+from utils.security import safe_output_path
 
 class EditorFrame(ctk.CTkFrame):
     def __init__(self, master):
@@ -115,7 +116,10 @@ class EditorFrame(ctk.CTkFrame):
         if not out_name.lower().endswith(f".{out_fmt}"):
             out_name += f".{out_fmt}"
 
-        output_path = os.path.join(out_dir, out_name)
+        output_path = safe_output_path(out_dir, out_name)
+        if not output_path:
+            messagebox.showwarning("Warning", "Invalid output filename.")
+            return
 
         if out_fmt == "mkv":
             self._save_mkv(output_path)

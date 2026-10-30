@@ -26,10 +26,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: System packages (Qt runtime libs + MKVToolNix for tests)
+      - name: System packages (Qt runtime libs + MKVToolNix + ffmpeg for tests)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libdbus-1-3 libfontconfig1 mkvtoolnix
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libdbus-1-3 libfontconfig1 mkvtoolnix ffmpeg
 
       - name: Python dependencies
         run: |
@@ -37,7 +37,7 @@ jobs:
           pip install PySide6-Essentials pyinstaller
 
       - name: Tests
-        run: python -m unittest tests.test_core tests.test_security tests.test_ui_smoke -v
+        run: python -m unittest tests.test_core tests.test_ffmpeg tests.test_security tests.test_ui_smoke -v
 
       - name: Build bundle
         run: |

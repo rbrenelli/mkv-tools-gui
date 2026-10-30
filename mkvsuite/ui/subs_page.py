@@ -65,10 +65,10 @@ class AddSubsPage(QWidget):
         self.tracks_title = section("Tracks in the video")
         vbox.addWidget(self.tracks_title)
         self.tracks = make_table(["Keep", "Track", "Codec", "Language", "Name", "Flags"])
-        self.tracks.setMinimumHeight(130)
+        self.tracks.setMinimumHeight(200)
         h = self.tracks.horizontalHeader()
         h.setSectionResizeMode(QHeaderView.Interactive)
-        for c, w in ((0, 70), (1, 130), (2, 200), (3, 110), (5, 130)):
+        for c, w in ((0, 75), (1, 140), (2, 200), (3, 120), (5, 130)):
             self.tracks.setColumnWidth(c, w)
         h.setSectionResizeMode(4, QHeaderView.Stretch)
         vbox.addWidget(self.tracks)
@@ -89,11 +89,11 @@ class AddSubsPage(QWidget):
         self.empty_hint = muted("No subtitle files yet. Add .srt / .ass files, or drop them on this window.")
         sbox.addWidget(self.empty_hint)
         self.subs = make_table(["File", "Language", "Track name", "Default", "Forced", ""])
-        self.subs.setMinimumHeight(130)
+        self.subs.setMinimumHeight(210)
         h = self.subs.horizontalHeader()
         h.setSectionResizeMode(QHeaderView.Interactive)
         h.setSectionResizeMode(0, QHeaderView.Stretch)
-        for c, w in ((1, 230), (2, 190), (3, 80), (4, 80), (5, 110)):
+        for c, w in ((1, 230), (2, 190), (3, 100), (4, 95), (5, 115)):
             self.subs.setColumnWidth(c, w)
         sbox.addWidget(self.subs)
         lay.addWidget(card(sbox), 3)

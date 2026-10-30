@@ -60,7 +60,7 @@ QLabel {{ background: transparent; }}
 QLabel#pageTitle {{ font-size: 21pt; font-weight: 700; }}
 QLabel#muted {{ color: {c['muted']}; }}
 QLabel#sectionTitle {{ font-weight: 700; font-size: 12pt; }}
-QLabel#appName {{ font-size: 14pt; font-weight: 700; }}
+QLabel#appName {{ font-size: 13pt; font-weight: 700; }}
 
 QFrame#sidebar {{ background: {c['surface']}; border: none; border-right: 1px solid {c['border']}; }}
 QListWidget#nav {{ background: transparent; border: none; outline: 0; font-size: 12pt; }}
@@ -119,6 +119,12 @@ QProgressBar {{ background: {c['border']}; border: none; border-radius: 4px; min
 QProgressBar::chunk {{ background: {c['accent']}; border-radius: 4px; }}
 QToolTip {{ background: {c['surface']}; color: {c['text']}; border: 1px solid {c['border_strong']}; padding: 5px; }}
 QCheckBox, QRadioButton {{ spacing: 8px; }}
+QRadioButton::indicator {{ width: 16px; height: 16px; border-radius: 10px; border: 2px solid {c['border_strong']};
+                           background: {c['surface']}; }}
+QRadioButton::indicator:hover {{ border-color: {c['accent']}; }}
+QRadioButton::indicator:checked {{ border-color: {c['accent']};
+    background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
+                                stop:0 {c['accent']}, stop:0.45 {c['accent']}, stop:0.5 {c['surface']}, stop:1 {c['surface']}); }}
 QSplitter::handle {{ background: transparent; }}
 """
 

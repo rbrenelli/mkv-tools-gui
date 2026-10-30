@@ -25,7 +25,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("MKV Tool Suite")
         self.setWindowIcon(QIcon(ICON_PATH))
-        self.setMinimumSize(880, 560)
+        self.setMinimumSize(1000, 560)
         self.resize(1180, 780)
         geo = settings().value("geometry")
         if geo:
@@ -34,7 +34,7 @@ class MainWindow(QMainWindow):
         langs = languages.load_languages()
         self.pages = [ExtractPage(langs), AddSubsPage(langs), EditPage(langs)]
         for p in self.pages:
-            p.setMinimumWidth(740)
+            p.setMinimumWidth(700)
 
         central = QWidget()
         outer = QHBoxLayout(central)
@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
         # --- sidebar
         side = QFrame()
         side.setObjectName("sidebar")
-        side.setFixedWidth(200)
+        side.setFixedWidth(240)
         sl = QVBoxLayout(side)
         sl.setContentsMargins(14, 18, 14, 14)
         head = QHBoxLayout()

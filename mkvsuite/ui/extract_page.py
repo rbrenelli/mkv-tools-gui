@@ -77,7 +77,7 @@ class ExtractPage(QWidget):
         h.setSectionResizeMode(COL_CODEC, QHeaderView.Interactive)
         h.setSectionResizeMode(COL_LANG, QHeaderView.Interactive)
         h.setSectionResizeMode(COL_NAME, QHeaderView.Interactive)
-        for col, w in ((COL_TRACK, 170), (COL_CODEC, 200), (COL_LANG, 100), (COL_NAME, 170)):
+        for col, w in ((COL_TRACK, 215), (COL_CODEC, 190), (COL_LANG, 115), (COL_NAME, 170)):
             self.tree.setColumnWidth(col, w)
         self.tree.itemChanged.connect(lambda *_: self._update_button())
         self.stack.addWidget(self.tree)

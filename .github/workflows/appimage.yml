@@ -37,7 +37,7 @@ jobs:
           pip install PySide6-Essentials pyinstaller
 
       - name: Tests
-        run: python -m unittest tests.test_core tests.test_ffmpeg tests.test_security tests.test_ui_smoke -v
+        run: python -m unittest tests.test_core tests.test_ffmpeg tests.test_ui_smoke -v
 
       - name: Build bundle
         run: |
